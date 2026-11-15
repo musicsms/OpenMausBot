@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  mcp-gateway:
+    build: .
+    container_name: openmausbot-mcp-gateway
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - PORT=8318
+      - HOST=127.0.0.1
+      - AUTH_DIR=/root/.mcp-gateway/auth
+    volumes:
+      - ~/.mcp-gateway/auth:/root/.mcp-gateway/auth

@@ -1,4 +1,5 @@
 export type ProviderType = "google" | "github" | "slack" | "notion" | "custom";
+export const KNOWN_PROVIDERS: readonly ProviderType[] = ["google", "github", "slack", "notion", "custom"];
 
 export interface OAuthTokenRecord {
   accessToken: string;

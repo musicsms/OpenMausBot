@@ -1,8 +1,7 @@
 import { loadConfig } from "./config.ts";
 import { AuthStore } from "./storage/auth-store.ts";
 import type { GatewayConfig, ProviderType } from "./types.ts";
-
-const KNOWN_PROVIDERS: readonly ProviderType[] = ["google", "github", "slack", "notion", "custom"];
+import { KNOWN_PROVIDERS } from "./types.ts";
 
 export interface CliIo {
   log: (...args: unknown[]) => void;

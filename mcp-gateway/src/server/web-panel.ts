@@ -9,10 +9,6 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function escapeJs(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, '\\"');
-}
-
 export function renderDashboardHtml(accounts: AccountCredential[]): string {
   const accountRows = accounts
     .map(
@@ -23,7 +19,7 @@ export function renderDashboardHtml(accounts: AccountCredential[]): string {
         <td style="padding: 8px; border: 1px solid #ccc;">${a.tokens ? "OAuth2" : "API Key / PAT"}</td>
         <td style="padding: 8px; border: 1px solid #ccc;">${Number.isFinite(a.updatedAt) ? new Date(a.updatedAt).toLocaleString() : "N/A"}</td>
         <td style="padding: 8px; border: 1px solid #ccc;">
-          <button onclick="deleteAccount('${escapeJs(a.provider)}', '${escapeJs(a.alias)}')">Delete</button>
+          <button data-provider="${escapeHtml(a.provider)}" data-alias="${escapeHtml(a.alias)}" class="delete-btn">Delete</button>
         </td>
       </tr>`,
     )
@@ -58,11 +54,29 @@ export function renderDashboardHtml(accounts: AccountCredential[]): string {
     </table>
   </div>
   <script>
-    async function deleteAccount(provider, alias) {
+    document.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || !target.classList.contains('delete-btn')) {
+        return;
+      }
+      const provider = target.dataset.provider;
+      const alias = target.dataset.alias;
+      if (!provider || !alias) return;
       if (!confirm(\`Delete account \${provider}:\${alias}?\`)) return;
-      await fetch(\`/api/accounts/\${provider}/\${alias}\`, { method: 'DELETE' });
-      location.reload();
-    }
+      try {
+        const res = await fetch(\`/api/accounts/\${encodeURIComponent(provider)}/\${encodeURIComponent(alias)}\`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+          alert(\`Failed to delete account: \${err.error || res.statusText}\`);
+          return;
+        }
+        location.reload();
+      } catch (err) {
+        alert(\`Failed to delete account: \${err instanceof Error ? err.message : String(err)}\`);
+      }
+    });
   </script>
 </body>
 </html>`;

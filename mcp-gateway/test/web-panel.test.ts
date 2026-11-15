@@ -48,6 +48,16 @@ describe("Web Panel", () => {
     expect(html).toContain("API Key / PAT");
   });
 
+  it("renders buttons with data attributes and delete-btn class without inline onclick", () => {
+    const html = renderDashboardHtml([
+      { provider: "google", alias: "work", createdAt: 1000, updatedAt: 2000 },
+    ]);
+    expect(html).toContain('data-provider="google"');
+    expect(html).toContain('data-alias="work"');
+    expect(html).toContain('class="delete-btn"');
+    expect(html).not.toContain("onclick=");
+  });
+
   it("escapes untrusted characters to prevent XSS", () => {
     const html = renderDashboardHtml([
       {
@@ -204,6 +214,18 @@ describe("Admin API Routes", () => {
     expect(data.error).toBeDefined();
   });
 
+  it("rejects POST /api/accounts when provider is not in KNOWN_PROVIDERS", async () => {
+    const res = await fetch(`${baseUrl}/api/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "unsupported_provider", alias: "work" }),
+    });
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain("Invalid provider");
+  });
+
   it("rejects POST /api/accounts when body is malformed JSON", async () => {
     const res = await fetch(`${baseUrl}/api/accounts`, {
       method: "POST",
@@ -214,6 +236,19 @@ describe("Admin API Routes", () => {
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toContain("JSON");
+  });
+
+  it("returns 413 when POST payload exceeds maximum size limit", async () => {
+    const hugeData = "x".repeat(1024 * 1024 + 100);
+    const res = await fetch(`${baseUrl}/api/accounts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "slack", alias: "big", data: hugeData }),
+    });
+
+    expect(res.status).toBe(413);
+    const data = await res.json();
+    expect(data.error).toContain("Payload too large");
   });
 
   it("deletes account on DELETE /api/accounts/:provider/:alias", async () => {
@@ -246,6 +281,13 @@ describe("Admin API Routes", () => {
     expect(data.error).toBeDefined();
   });
 
+  it("returns 400 on malformed URL encoding in route params", async () => {
+    const res = await fetch(`${baseUrl}/api/accounts/%E0%A4%A/test`);
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain("Malformed URL encoding");
+  });
+
   it("returns 405 Method Not Allowed for unsupported methods on /api/accounts", async () => {
     const res = await fetch(`${baseUrl}/api/accounts`, {
       method: "PUT",
@@ -265,6 +307,31 @@ describe("Admin API Routes", () => {
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toBe("disk read failure");
+  });
+
+  it("handleAdminRequest processes requests directly", async () => {
+    const directServer = createServer(async (req, res) => {
+      const handled = await handleAdminRequest(req, res, store);
+      if (!handled) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Not found" }));
+      }
+    });
+
+    await new Promise<void>((resolve) => {
+      directServer.listen(0, "127.0.0.1", () => resolve());
+    });
+
+    try {
+      const addr = directServer.address();
+      if (!addr || typeof addr === "string") throw new Error("No address");
+      const res = await fetch(`http://127.0.0.1:${addr.port}/api/accounts`);
+      expect(res.status).toBe(200);
+    } finally {
+      await new Promise<void>((resolve) => {
+        directServer.close(() => resolve());
+      });
+    }
   });
 
   it("createAdminServer runs as standalone server", async () => {
@@ -287,4 +354,3 @@ describe("Admin API Routes", () => {
     }
   });
 });
-

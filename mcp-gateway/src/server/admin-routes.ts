@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AuthStore } from "../storage/auth-store.ts";
 import type { AccountCredential, OAuthTokenRecord, ProviderType } from "../types.ts";
+import { KNOWN_PROVIDERS } from "../types.ts";
 import { renderDashboardHtml } from "./web-panel.ts";
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -8,6 +9,13 @@ const ACCOUNT_ITEM_ROUTE = /^\/api\/accounts\/([^/]+)\/([^/]+)\/?$/;
 
 export interface AdminRouteOptions {
   webPanelEnabled?: boolean;
+}
+
+class PayloadTooLargeError extends Error {
+  constructor(message = "Payload too large") {
+    super(message);
+    this.name = "PayloadTooLargeError";
+  }
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -18,8 +26,9 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
     req.on("data", (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        req.destroy();
-        reject(new Error("Payload too large"));
+        req.removeAllListeners("data");
+        req.resume();
+        reject(new PayloadTooLargeError());
         return;
       }
       chunks.push(chunk);
@@ -98,6 +107,11 @@ export async function handleAdminRequest(
       try {
         body = await readJsonBody(req);
       } catch (err) {
+        if (err instanceof PayloadTooLargeError) {
+          res.writeHead(413, { "Content-Type": "application/json", Connection: "close" });
+          res.end(JSON.stringify({ error: "Payload too large" }));
+          return true;
+        }
         sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid request body" });
         return true;
       }
@@ -107,6 +121,13 @@ export async function handleAdminRequest(
 
       if (!provider || !alias) {
         sendJson(res, 400, { error: "Missing required fields: provider and alias" });
+        return true;
+      }
+
+      if (!KNOWN_PROVIDERS.includes(provider as ProviderType)) {
+        sendJson(res, 400, {
+          error: `Invalid provider: '${provider}'. Must be one of: ${KNOWN_PROVIDERS.join(", ")}`,
+        });
         return true;
       }
 
@@ -144,8 +165,15 @@ export async function handleAdminRequest(
 
   const match = pathname.match(ACCOUNT_ITEM_ROUTE);
   if (match) {
-    const provider = decodeURIComponent(match[1]) as ProviderType;
-    const alias = decodeURIComponent(match[2]);
+    let provider: ProviderType;
+    let alias: string;
+    try {
+      provider = decodeURIComponent(match[1]) as ProviderType;
+      alias = decodeURIComponent(match[2]);
+    } catch {
+      sendJson(res, 400, { error: "Malformed URL encoding in route parameters" });
+      return true;
+    }
 
     if (method === "DELETE") {
       try {
@@ -204,4 +232,3 @@ export function createAdminServer(store: AuthStore, options?: AdminRouteOptions)
     }
   });
 }
-

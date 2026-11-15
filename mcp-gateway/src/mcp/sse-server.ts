@@ -88,7 +88,7 @@ export function createGatewayServer(
         return;
       }
       const sessionId = url.searchParams.get("sessionId");
-      const transport = (sessionId ? transports.get(sessionId) : null) ?? activeTransport;
+      const transport = sessionId ? transports.get(sessionId) : activeTransport;
       if (transport) {
         await transport.handlePostMessage(req, res);
       } else {

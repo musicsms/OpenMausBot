@@ -22,8 +22,10 @@ export async function bootstrap(customConfig?: Partial<GatewayConfig>) {
   });
 
   const server = createGatewayServer(config, store, router);
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
     server.listen(config.port, config.host, () => {
+      server.off("error", reject);
       console.log(`Unified MCP Gateway running at http://${config.host}:${config.port}`);
       console.log(`- MCP SSE Endpoint: http://${config.host}:${config.port}/sse`);
       console.log(`- Web Dashboard:    http://${config.host}:${config.port}/`);

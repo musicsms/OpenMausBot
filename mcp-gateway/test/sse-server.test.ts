@@ -94,6 +94,33 @@ describe("MCP Router", () => {
     expect(capturedAlias).toBe("prod");
   });
 
+  it("executes a registered tool when alias contains double underscores", async () => {
+    const router = new McpRouter({
+      github: {
+        provider: "github",
+        getTools: (alias) => [
+          {
+            name: `github__${alias}__nested_action`,
+            description: "Nested action",
+            parameters: { type: "object" },
+            execute: async (_args, cred) => ({ text: `nested from ${cred.alias}` }),
+          },
+        ],
+      },
+    });
+
+    const accounts = [
+      { provider: "github" as const, alias: "team__staging", apiKey: "ghp_nested", createdAt: 0, updatedAt: 0 },
+    ];
+
+    const result = await router.executeTool(
+      "github__team__staging__nested_action",
+      {},
+      accounts,
+    );
+    expect(result.text).toBe("nested from team__staging");
+  });
+
   it("throws error when executing a tool that does not exist", async () => {
     const router = new McpRouter({});
     await expect(router.executeTool("unknown__tool", {}, [])).rejects.toThrow(
@@ -430,6 +457,25 @@ describe("MCP Protocol over SSE Integration", () => {
     await client1.close();
     await client2.close();
   });
+
+  it("returns 400 when POST /message is called with unknown sessionId even when active transport exists", async () => {
+    const sseUrl = new URL(`http://127.0.0.1:${serverPort}/sse`);
+    const transport = new SSEClientTransport(sseUrl);
+    const client = new Client({ name: "active-client", version: "1.0.0" }, { capabilities: {} });
+    await client.connect(transport);
+
+    const res = await fetch(`http://127.0.0.1:${serverPort}/message?sessionId=non-existent-session-id`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 99 }),
+    });
+
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("No active SSE transport connection");
+
+    await client.close();
+  });
 });
 
 describe("Bootstrap Entrypoint", () => {
@@ -441,6 +487,16 @@ describe("Bootstrap Entrypoint", () => {
 
   afterEach(async () => {
     await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it("rejects bootstrap when server listen encounters an error", async () => {
+    await expect(
+      bootstrap({
+        port: -1,
+        host: "invalid-host-name-that-cannot-bind",
+        authDir: tempDir,
+      }),
+    ).rejects.toThrow();
   });
 
   it("initializes and starts the gateway service with isolated config", async () => {

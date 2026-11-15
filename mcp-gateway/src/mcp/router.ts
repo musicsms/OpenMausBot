@@ -30,10 +30,17 @@ export class McpRouter {
       throw new Error(`Tool "${toolName}" not found in Unified MCP Gateway.`);
     }
 
-    const parts = toolName.split("__");
-    const [provider, alias] = parts;
-    const account = accounts.find((a) => a.provider === provider && a.alias === alias);
+    const firstSep = toolName.indexOf("__");
+    const provider = firstSep !== -1 ? toolName.slice(0, firstSep) : toolName;
+    const rest = firstSep !== -1 ? toolName.slice(firstSep + 2) : "";
+
+    const account =
+      accounts.find((a) => a.provider === provider && rest.startsWith(`${a.alias}__`)) ??
+      accounts.find((a) => a.provider === provider && toolName.split("__")[1] === a.alias);
+
     if (!account) {
+      const secondSep = rest.indexOf("__");
+      const alias = secondSep !== -1 ? rest.slice(0, secondSep) : rest || "unknown";
       throw new Error(`Account credentials for "${provider}:${alias}" not found in auth storage.`);
     }
 

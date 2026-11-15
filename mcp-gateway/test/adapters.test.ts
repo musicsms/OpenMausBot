@@ -66,6 +66,41 @@ describe("Service Adapters", () => {
       expect(decodedRaw).toContain("Test body");
     });
 
+    it("strips carriage returns and newlines from to and subject headers in gmail_send_mail", async () => {
+      const adapter = new GoogleAdapter();
+      const tools = adapter.getTools("work");
+      const sendTool = tools.find((t) => t.name === "google__work__gmail_send_mail")!;
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "msg_clean" }),
+      });
+      globalThis.fetch = mockFetch;
+
+      const cred: AccountCredential = {
+        provider: "google",
+        alias: "work",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        tokens: { accessToken: "ya29.mock_token" },
+      };
+
+      await sendTool.execute(
+        {
+          to: "alice@example.com\r\nBcc: evil@example.com",
+          subject: "Hello\r\nInjected: true",
+          body: "Test body",
+        },
+        cred,
+      );
+
+      const [, init] = mockFetch.mock.calls[0];
+      const bodyObj = JSON.parse(init.body as string);
+      const decodedRaw = Buffer.from(bodyObj.raw, "base64url").toString("utf-8");
+      expect(decodedRaw).toContain("To: alice@example.comBcc: evil@example.com\r\nSubject: HelloInjected: true\r\n");
+    });
+
     it("handles gmail_send_mail missing token or args, and API errors", async () => {
       const adapter = new GoogleAdapter();
       const tools = adapter.getTools("work");
@@ -276,6 +311,42 @@ describe("Service Adapters", () => {
       );
 
       expect(result.text).toContain("Bug in parser");
+      expect(result.text).toContain("42");
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toBe("https://api.github.com/repos/octocat/Hello-World/issues/42");
+    });
+
+    it("allows numeric string coercion for issue_number in get_issue", async () => {
+      const adapter = new GitHubAdapter();
+      const tools = adapter.getTools("dev");
+      const getIssueTool = tools.find((t) => t.name === "github__dev__get_issue")!;
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          number: 42,
+          title: "Bug in parser",
+          state: "open",
+          body: "Found a bug",
+          html_url: "https://github.com/octocat/Hello-World/issues/42",
+        }),
+      });
+      globalThis.fetch = mockFetch;
+
+      const cred: AccountCredential = {
+        provider: "github",
+        alias: "dev",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        apiKey: "ghp_tok",
+      };
+
+      const result = await getIssueTool.execute(
+        { owner: "octocat", repo: "Hello-World", issue_number: "42" as unknown as number },
+        cred,
+      );
+
       expect(result.text).toContain("42");
       const [url] = mockFetch.mock.calls[0];
       expect(url).toBe("https://api.github.com/repos/octocat/Hello-World/issues/42");

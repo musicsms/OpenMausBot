@@ -33,6 +33,7 @@ export function registerLocalGatewayPreset(
       url: gateway.url,
       headers: gateway.headers,
       enabled: gateway.enabled,
+      apps: gateway.apps,
     },
   };
 }

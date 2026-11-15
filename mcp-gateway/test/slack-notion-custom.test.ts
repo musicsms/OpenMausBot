@@ -222,6 +222,10 @@ describe("Slack, Notion, and Custom Adapters", () => {
       const tools = notion.getTools("corp");
       const queryTool = tools.find((t) => t.name === "notion__corp__query_database")!;
       expect(queryTool).toBeDefined();
+      expect((queryTool.parameters.properties as Record<string, unknown>).filter).toEqual({
+        type: "object",
+        description: "Notion filter criteria",
+      });
 
       const mockItems = [{ object: "page", id: "row-1", properties: { Status: "Done" } }];
       const mockFetch = vi.fn().mockResolvedValue({
@@ -514,6 +518,37 @@ describe("Slack, Notion, and Custom Adapters", () => {
 
       const execResult = await router.executeTool("custom__app__weather", { city: "Seattle" }, accounts);
       expect(execResult.text).toContain("72");
+    });
+
+    it("resolves multi-underscore aliases without prefix collisions", async () => {
+      const custom = new CustomRestAdapter([
+        {
+          name: "info",
+          description: "Get info",
+          endpoint: "https://api.local/info",
+          method: "GET",
+        },
+      ]);
+
+      const router = new McpRouter({ custom });
+
+      const accounts: AccountCredential[] = [
+        { provider: "custom", alias: "app", apiKey: "app-tok", createdAt: 0, updatedAt: 0 },
+        { provider: "custom", alias: "app_team", apiKey: "team-tok", createdAt: 0, updatedAt: 0 },
+      ];
+
+      const capturedHeaders: Record<string, string>[] = [];
+      globalThis.fetch = vi.fn().mockImplementation(async (_url, init) => {
+        capturedHeaders.push(init.headers);
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ ok: true }),
+        };
+      });
+
+      await router.executeTool("custom__app_team__info", {}, accounts);
+      expect(capturedHeaders[0]["Authorization"]).toBe("Bearer team-tok");
     });
   });
 });

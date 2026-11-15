@@ -37,6 +37,7 @@ describe("OpenMausBot Gateway Preset", () => {
       url: "http://127.0.0.1:8318/sse",
       headers: {},
       enabled: true,
+      apps: false,
     });
     expect(updated.existing).toEqual(current.existing);
 

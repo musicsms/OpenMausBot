@@ -25,8 +25,10 @@ export class GoogleAdapter implements ServiceAdapter {
           if (typeof args.subject !== "string") throw new Error("Missing required argument 'subject'");
           if (typeof args.body !== "string") throw new Error("Missing required argument 'body'");
 
+          const to = args.to.replace(/[\r\n]/g, "");
+          const subject = args.subject.replace(/[\r\n]/g, "");
           const rawMessage = Buffer.from(
-            `To: ${args.to}\r\nSubject: ${args.subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${args.body}`,
+            `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${args.body}`,
           ).toString("base64url");
 
           const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {

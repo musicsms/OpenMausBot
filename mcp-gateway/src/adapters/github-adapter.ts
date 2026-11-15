@@ -72,11 +72,13 @@ export class GitHubAdapter implements ServiceAdapter {
           if (!token) throw new Error(`Missing token for account '${alias}'`);
           if (!args.owner || typeof args.owner !== "string") throw new Error("Missing required argument 'owner'");
           if (!args.repo || typeof args.repo !== "string") throw new Error("Missing required argument 'repo'");
-          if (args.issue_number === undefined || typeof args.issue_number !== "number") {
+          const issueNum =
+            typeof args.issue_number === "string" ? parseInt(args.issue_number, 10) : args.issue_number;
+          if (issueNum === undefined || typeof issueNum !== "number" || Number.isNaN(issueNum)) {
             throw new Error("Missing required argument 'issue_number'");
           }
 
-          const url = `https://api.github.com/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/issues/${encodeURIComponent(String(args.issue_number))}`;
+          const url = `https://api.github.com/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/issues/${encodeURIComponent(String(issueNum))}`;
 
           const res = await fetch(url, {
             headers: {

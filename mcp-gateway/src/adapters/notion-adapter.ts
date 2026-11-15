@@ -48,6 +48,7 @@ export class NotionAdapter implements ServiceAdapter {
           properties: {
             database_id: { type: "string", description: "Database ID to query" },
             page_size: { type: "number", description: "Page size limit" },
+            filter: { type: "object", description: "Notion filter criteria" },
           },
           required: ["database_id"],
         },

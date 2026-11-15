@@ -35,8 +35,14 @@ export class McpRouter {
     const rest = firstSep !== -1 ? toolName.slice(firstSep + 2) : "";
 
     const account =
-      accounts.find((a) => a.provider === provider && rest.startsWith(`${a.alias}__`)) ??
-      accounts.find((a) => a.provider === provider && toolName.split("__")[1] === a.alias);
+      accounts
+        .slice()
+        .sort((a, b) => b.alias.length - a.alias.length)
+        .find((a) => a.provider === provider && rest.startsWith(`${a.alias}__`)) ??
+      accounts
+        .slice()
+        .sort((a, b) => b.alias.length - a.alias.length)
+        .find((a) => a.provider === provider && toolName.split("__")[1] === a.alias);
 
     if (!account) {
       const secondSep = rest.indexOf("__");

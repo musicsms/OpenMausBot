@@ -6,11 +6,16 @@ export type RefreshHandler = (refreshToken: string, metadata?: Record<string, un
 export class TokenRefresher {
   private timer: NodeJS.Timeout | null = null;
   private readonly EXPIRY_BUFFER_MS = 5 * 60 * 1000;
+  private readonly handlers: Partial<Record<ProviderType, RefreshHandler>>;
+  private readonly store?: AuthStore;
 
   constructor(
-    private readonly handlers: Partial<Record<ProviderType, RefreshHandler>>,
-    private readonly store?: AuthStore,
-  ) {}
+    handlers: Partial<Record<ProviderType, RefreshHandler>>,
+    store?: AuthStore,
+  ) {
+    this.handlers = handlers;
+    this.store = store;
+  }
 
   async refreshTokenIfNeeded(account: AccountCredential): Promise<AccountCredential> {
     if (!account.tokens?.refreshToken) return account;

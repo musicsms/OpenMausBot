@@ -3,7 +3,11 @@ import { join } from "node:path";
 import type { AccountCredential, ProviderType } from "../types.ts";
 
 export class AuthStore {
-  constructor(private readonly authDir: string) {}
+  private readonly authDir: string;
+
+  constructor(authDir: string) {
+    this.authDir = authDir;
+  }
 
   private filename(provider: ProviderType, alias: string): string {
     const safeProvider = provider.toLowerCase().replace(/[^a-z0-9_-]/g, "");

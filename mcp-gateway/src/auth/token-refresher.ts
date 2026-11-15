@@ -15,7 +15,9 @@ export class TokenRefresher {
   async refreshTokenIfNeeded(account: AccountCredential): Promise<AccountCredential> {
     if (!account.tokens?.refreshToken) return account;
 
-    const expiresAt = account.tokens.expiresAt || 0;
+    const expiresAt = account.tokens.expiresAt;
+    if (!expiresAt || expiresAt <= 0) return account;
+
     const needsRefresh = Date.now() + this.EXPIRY_BUFFER_MS >= expiresAt;
 
     if (!needsRefresh) return account;
@@ -47,10 +49,13 @@ export class TokenRefresher {
       try {
         const accounts = await this.store.listAccounts();
         for (const account of accounts) {
-          await this.refreshTokenIfNeeded(account);
+          try {
+            await this.refreshTokenIfNeeded(account);
+          } catch {}
         }
       } catch {}
     }, intervalMs);
+    this.timer.unref?.();
   }
 
   stopBackgroundSync(): void {

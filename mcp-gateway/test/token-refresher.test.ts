@@ -237,6 +237,57 @@ describe("TokenRefresher", () => {
     expect(mockRefresherFn).toHaveBeenCalledOnce();
   });
 
+  it("does not refresh when account tokens lack expiresAt or expiresAt is non-positive", async () => {
+    const mockRefresherFn = vi.fn();
+    const refresher = new TokenRefresher({
+      google: mockRefresherFn,
+    });
+
+    const noExpiresAtAccount: AccountCredential = {
+      provider: "google",
+      alias: "work",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      tokens: {
+        accessToken: "access-tok",
+        refreshToken: "refresh-tok",
+      },
+    };
+
+    const zeroExpiresAtAccount: AccountCredential = {
+      provider: "google",
+      alias: "work2",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      tokens: {
+        accessToken: "access-tok",
+        refreshToken: "refresh-tok",
+        expiresAt: 0,
+      },
+    };
+
+    const negativeExpiresAtAccount: AccountCredential = {
+      provider: "google",
+      alias: "work3",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      tokens: {
+        accessToken: "access-tok",
+        refreshToken: "refresh-tok",
+        expiresAt: -10,
+      },
+    };
+
+    const res1 = await refresher.refreshTokenIfNeeded(noExpiresAtAccount);
+    const res2 = await refresher.refreshTokenIfNeeded(zeroExpiresAtAccount);
+    const res3 = await refresher.refreshTokenIfNeeded(negativeExpiresAtAccount);
+
+    expect(mockRefresherFn).not.toHaveBeenCalled();
+    expect(res1).toBe(noExpiresAtAccount);
+    expect(res2).toBe(zeroExpiresAtAccount);
+    expect(res3).toBe(negativeExpiresAtAccount);
+  });
+
   it("handles startBackgroundSync idempotency and background sync errors gracefully", async () => {
     vi.useFakeTimers();
 
@@ -248,6 +299,61 @@ describe("TokenRefresher", () => {
     vi.spyOn(store, "listAccounts").mockRejectedValue(new Error("Disk failure"));
 
     await expect(vi.advanceTimersByTimeAsync(5000)).resolves.not.toThrow();
+
+    refresher.stopBackgroundSync();
+  });
+
+  it("isolates refresh failure of one account so subsequent accounts continue refreshing during background sync", async () => {
+    vi.useFakeTimers();
+
+    const mockRefresherFn = vi.fn().mockImplementation(async (token: string) => {
+      if (token === "failing-token") {
+        throw new Error("Provider 500 error");
+      }
+      return {
+        accessToken: "refreshed-" + token,
+        expiresAt: Date.now() + 3600000,
+      };
+    });
+
+    const refresher = new TokenRefresher(
+      {
+        google: mockRefresherFn,
+      },
+      store,
+    );
+
+    await store.saveAccount({
+      provider: "google",
+      alias: "account1-fails",
+      createdAt: 1000,
+      updatedAt: 1000,
+      tokens: {
+        accessToken: "old-1",
+        refreshToken: "failing-token",
+        expiresAt: Date.now() - 1000,
+      },
+    });
+
+    await store.saveAccount({
+      provider: "google",
+      alias: "account2-succeeds",
+      createdAt: 1000,
+      updatedAt: 1000,
+      tokens: {
+        accessToken: "old-2",
+        refreshToken: "success-token",
+        expiresAt: Date.now() - 1000,
+      },
+    });
+
+    refresher.startBackgroundSync(10000);
+
+    await vi.advanceTimersByTimeAsync(10000);
+    await vi.waitFor(() => expect(mockRefresherFn).toHaveBeenCalledTimes(2));
+
+    const updatedAccount2 = await store.getAccount("google", "account2-succeeds");
+    expect(updatedAccount2?.tokens?.accessToken).toBe("refreshed-success-token");
 
     refresher.stopBackgroundSync();
   });

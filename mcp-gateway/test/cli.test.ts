@@ -20,7 +20,30 @@ describe("OAuth Callback Helper", () => {
 
     const code = await testPromise;
     expect(code).toBe("mock_auth_code_123");
+    const text = await res.text();
+    expect(text).toContain("Authentication Successful");
     await server.close();
+  });
+
+  it("rejects waitForCode when error is returned in callback query param", async () => {
+    const server = await createLocalOAuthCallbackServer(0);
+    const testPromise = server.waitForCode();
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/callback?error=access_denied&error_description=User+denied+access`);
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("Authentication Failed");
+
+    await expect(testPromise).rejects.toThrow("User denied access");
+    await server.close();
+  });
+
+  it("rejects waitForCode if server is closed before authorization", async () => {
+    const server = await createLocalOAuthCallbackServer(0);
+    const testPromise = server.waitForCode();
+
+    await server.close();
+    await expect(testPromise).rejects.toThrow("Server closed before authorization completed");
   });
 
   it("returns 400 when code query param is missing", async () => {
@@ -94,6 +117,57 @@ describe("CLI Runner", () => {
     expect(code).toBe(1);
     expect(exitCode).toBe(1);
     expect(errors.some((e) => e.includes("Usage: mcp-gateway auth"))).toBe(true);
+  });
+
+  it("fails auth if provider is unknown", async () => {
+    const errors: string[] = [];
+    let exitCode: number | undefined;
+
+    const code = await runCli(["auth", "unknown-provider", "--alias", "work"], {
+      store,
+      io: {
+        error: (msg) => errors.push(String(msg)),
+        exit: (c) => { exitCode = c; },
+      },
+    });
+
+    expect(code).toBe(1);
+    expect(exitCode).toBe(1);
+    expect(errors.some((e) => e.includes('Unknown provider "unknown-provider"'))).toBe(true);
+  });
+
+  it("fails auth with exit code 1 if --pat is missing argument", async () => {
+    const errors: string[] = [];
+    let exitCode: number | undefined;
+
+    const code = await runCli(["auth", "github", "--alias", "work", "--pat"], {
+      store,
+      io: {
+        error: (msg) => errors.push(String(msg)),
+        exit: (c) => { exitCode = c; },
+      },
+    });
+
+    expect(code).toBe(1);
+    expect(exitCode).toBe(1);
+    expect(errors.some((e) => e.includes("Missing token for --pat"))).toBe(true);
+  });
+
+  it("fails auth with exit code 1 if --pat is followed by another flag", async () => {
+    const errors: string[] = [];
+    let exitCode: number | undefined;
+
+    const code = await runCli(["auth", "github", "--pat", "--alias", "work"], {
+      store,
+      io: {
+        error: (msg) => errors.push(String(msg)),
+        exit: (c) => { exitCode = c; },
+      },
+    });
+
+    expect(code).toBe(1);
+    expect(exitCode).toBe(1);
+    expect(errors.some((e) => e.includes("Missing token for --pat"))).toBe(true);
   });
 
   it("saves PAT credential directly via auth command", async () => {

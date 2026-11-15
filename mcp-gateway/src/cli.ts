@@ -2,6 +2,8 @@ import { loadConfig } from "./config.ts";
 import { AuthStore } from "./storage/auth-store.ts";
 import type { GatewayConfig, ProviderType } from "./types.ts";
 
+const KNOWN_PROVIDERS: readonly ProviderType[] = ["google", "github", "slack", "notion", "custom"];
+
 export interface CliIo {
   log: (...args: unknown[]) => void;
   error: (...args: unknown[]) => void;
@@ -54,9 +56,25 @@ export async function runCli(
       return 1;
     }
 
+    if (!KNOWN_PROVIDERS.includes(provider)) {
+      error(`Unknown provider "${provider}". Supported providers: ${KNOWN_PROVIDERS.join(", ")}`);
+      if (exit) {
+        exit(1);
+      }
+      return 1;
+    }
+
     const patIndex = args.indexOf("--pat");
     if (patIndex !== -1) {
       const pat = args[patIndex + 1];
+      if (!pat || pat.startsWith("--")) {
+        error("Missing token for --pat");
+        if (exit) {
+          exit(1);
+        }
+        return 1;
+      }
+
       await store.saveAccount({
         provider,
         alias,

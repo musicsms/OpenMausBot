@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:mobile/core/storage/pairing_storage.dart';
 import 'package:mobile/features/pairing/pairing_model.dart';
 import 'package:mobile/features/pairing/pairing_view.dart';
@@ -61,7 +62,7 @@ void main() {
   });
 
   group('PairingView', () {
-    testWidgets('renders QR container, textfield, and manual button',
+    testWidgets('renders QR container with MobileScanner by default',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -73,9 +74,24 @@ void main() {
       );
 
       expect(find.text('Pair with Desktop'), findsOneWidget);
-      expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
+      expect(find.byType(MobileScanner), findsOneWidget);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.text('Connect with Code'), findsOneWidget);
+    });
+
+    testWidgets('renders custom scanner widget when provided',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PairingView(
+            scannerWidget: const Icon(Icons.qr_code_scanner),
+            onPairSuccess: (_) {},
+            onManualCodeSubmit: (_) {},
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.qr_code_scanner), findsOneWidget);
     });
 
     testWidgets('submits 6-digit code on manual button tap',
@@ -118,6 +134,23 @@ void main() {
       await tester.pump();
 
       expect(submittedCode, isNull);
+    });
+
+    testWidgets('filters non-digit characters in code TextField',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PairingView(
+            onPairSuccess: (_) {},
+            onManualCodeSubmit: (_) {},
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'ab12cd34');
+      await tester.pump();
+
+      expect(find.text('1234'), findsOneWidget);
     });
 
     testWidgets('processes scanned QR payload when scanner triggers callback',

@@ -87,6 +87,7 @@ void main() {
   });
 
   testWidgets('E2E Flow: Tool approval interaction triggers haptics and approves action', (WidgetTester tester) async {
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
     final List<MethodCall> hapticCalls = <MethodCall>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform,
@@ -135,6 +136,7 @@ void main() {
 
   test('E2E Flow: Live fake companion process serves health, pairing, and SSE messages', () async {
     HttpOverrides.global = _RealHttpOverrides();
+    addTearDown(() => HttpOverrides.global = null);
 
     final process = await Process.start(
       'node',

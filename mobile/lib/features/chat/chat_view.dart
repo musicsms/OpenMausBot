@@ -48,7 +48,11 @@ class _ChatViewState extends State<ChatView> {
   @override
   void didUpdateWidget(ChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.messages.length != oldWidget.messages.length || widget.isStreaming) {
+    final hasNewMessage = widget.messages.length != oldWidget.messages.length;
+    final isNearBottom = !_scrollController.hasClients ||
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 60;
+
+    if (hasNewMessage || (widget.isStreaming && isNearBottom)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _scrollToBottom();

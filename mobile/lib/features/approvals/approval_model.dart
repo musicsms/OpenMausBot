@@ -18,7 +18,9 @@ class ApprovalRequest {
       id: json['id'] as String,
       botId: json['botId'] as String,
       toolName: json['toolName'] as String,
-      arguments: (json['arguments'] as Map<String, dynamic>?) ?? {},
+      arguments: (json['arguments'] is Map)
+          ? Map<String, dynamic>.from(json['arguments'] as Map)
+          : {},
       dangerLevel: json['dangerLevel'] as String?,
     );
   }

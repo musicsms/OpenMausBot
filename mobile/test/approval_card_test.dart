@@ -7,6 +7,7 @@ import 'package:mobile/features/approvals/approval_model.dart';
 
 void main() {
   testWidgets('ApprovalCard displays tool arguments and handles approve tap', (WidgetTester tester) async {
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
     final List<MethodCall> hapticCalls = <MethodCall>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform,
@@ -52,6 +53,7 @@ void main() {
   });
 
   testWidgets('ApprovalCard handles reject tap and haptic feedback', (WidgetTester tester) async {
+    addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
     final List<MethodCall> hapticCalls = <MethodCall>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       SystemChannels.platform,
@@ -153,5 +155,24 @@ void main() {
     );
     final minimalJson = minimalRequest.toJson();
     expect(minimalJson.containsKey('dangerLevel'), false);
+  });
+
+  test('ApprovalRequest coerces non-generic and invalid map arguments defensively', () {
+    final dynamicMap = <dynamic, dynamic>{'num': 42};
+    final req1 = ApprovalRequest.fromJson({
+      'id': 'req-map',
+      'botId': 'chief',
+      'toolName': 'calc',
+      'arguments': dynamicMap,
+    });
+    expect(req1.arguments, {'num': 42});
+
+    final req2 = ApprovalRequest.fromJson({
+      'id': 'req-bad',
+      'botId': 'chief',
+      'toolName': 'calc',
+      'arguments': 'not-a-map',
+    });
+    expect(req2.arguments, isEmpty);
   });
 }

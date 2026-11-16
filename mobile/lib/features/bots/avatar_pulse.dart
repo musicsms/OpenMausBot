@@ -104,10 +104,10 @@ class _AvatarPulseState extends State<AvatarPulse> with SingleTickerProviderStat
                         widget.imagePath!,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 24),
+                            Icon(Icons.smart_toy_outlined, color: Colors.white, size: widget.size * 0.5),
                       ),
                     )
-                  : const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 24),
+                  : Icon(Icons.smart_toy_outlined, color: Colors.white, size: widget.size * 0.5),
             ),
           ],
         ),

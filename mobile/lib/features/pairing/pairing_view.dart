@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/theme/grok_theme.dart';
 import 'pairing_model.dart';
 
 class PairingView extends StatefulWidget {
-  final Function(PairingPayload payload) onPairSuccess;
-  final Function(String code) onManualCodeSubmit;
+  final ValueChanged<PairingPayload> onPairSuccess;
+  final ValueChanged<String> onManualCodeSubmit;
   final Widget? scannerWidget;
 
   const PairingView({
@@ -31,9 +33,7 @@ class PairingViewState extends State<PairingView> {
     try {
       final payload = PairingPayload.fromJsonString(rawJson);
       widget.onPairSuccess(payload);
-    } catch (_) {
-      // Ignored if invalid QR payload
-    }
+    } catch (_) {}
   }
 
   @override
@@ -60,8 +60,19 @@ class PairingViewState extends State<PairingView> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: widget.scannerWidget ??
-                      const Center(
-                        child: Icon(Icons.qr_code_scanner, size: 80, color: GrokTheme.glowCyan),
+                      MobileScanner(
+                        onDetect: (capture) {
+                          final List<Barcode> barcodes = capture.barcodes;
+                          for (final barcode in barcodes) {
+                            if (barcode.rawValue != null) {
+                              handleScannedPayload(barcode.rawValue!);
+                              break;
+                            }
+                          }
+                        },
+                        errorBuilder: (context, error, child) => const Center(
+                          child: Icon(Icons.qr_code_scanner, size: 80, color: GrokTheme.glowCyan),
+                        ),
                       ),
                 ),
                 const SizedBox(height: 32),
@@ -74,6 +85,7 @@ class PairingViewState extends State<PairingView> {
                 TextField(
                   controller: _codeController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   maxLength: 6,
                   style: const TextStyle(color: Colors.white, letterSpacing: 8, fontSize: 20),
                   textAlign: TextAlign.center,

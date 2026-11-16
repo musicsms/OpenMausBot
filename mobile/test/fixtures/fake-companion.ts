@@ -17,6 +17,11 @@ export function createFakeCompanionServer() {
     }
 
     if (url.pathname.startsWith("/api/threads/") && url.pathname.endsWith("/messages")) {
+      if (!req.headers.authorization?.startsWith("Bearer ")) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",

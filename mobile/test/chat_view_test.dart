@@ -86,6 +86,29 @@ void main() {
       expect(find.text('Test message'), findsNothing);
     });
 
+    testWidgets('sends message and clears input when submitted via keyboard action', (WidgetTester tester) async {
+      String? sentMessage;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: GrokTheme.themeData,
+          home: ChatView(
+            messages: const [],
+            isStreaming: false,
+            onSendMessage: (msg) {
+              sentMessage = msg;
+            },
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'Keyboard message');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pump();
+
+      expect(sentMessage, 'Keyboard message');
+      expect(find.text('Keyboard message'), findsNothing);
+    });
+
     testWidgets('does not send message when input is empty or whitespace', (WidgetTester tester) async {
       var sendCount = 0;
       await tester.pumpWidget(
@@ -138,6 +161,47 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Message 2'), findsOneWidget);
+    });
+
+    testWidgets('unmounting during post-frame callback does not throw', (WidgetTester tester) async {
+      final messages1 = [
+        ChatMessage(id: '1', role: 'user', content: 'Message 1', timestamp: DateTime.now()),
+      ];
+      final messages2 = [
+        ChatMessage(id: '1', role: 'user', content: 'Message 1', timestamp: DateTime.now()),
+        ChatMessage(id: '2', role: 'assistant', content: 'Message 2', timestamp: DateTime.now()),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: GrokTheme.themeData,
+          home: ChatView(
+            messages: messages1,
+            isStreaming: false,
+            onSendMessage: (_) {},
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: GrokTheme.themeData,
+          home: ChatView(
+            messages: messages2,
+            isStreaming: true,
+            onSendMessage: (_) {},
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SizedBox.shrink(),
+        ),
+      );
+
+      await tester.pump();
+      expect(tester.takeException(), isNull);
     });
   });
 }

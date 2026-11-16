@@ -26,6 +26,7 @@ class _ChatViewState extends State<ChatView> {
   final ScrollController _scrollController = ScrollController();
 
   void _scrollToBottom() {
+    if (!mounted) return;
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
@@ -35,11 +36,24 @@ class _ChatViewState extends State<ChatView> {
     }
   }
 
+  void _handleSend() {
+    final text = _inputController.text.trim();
+    if (text.isNotEmpty) {
+      HapticFeedback.lightImpact();
+      widget.onSendMessage(text);
+      _inputController.clear();
+    }
+  }
+
   @override
   void didUpdateWidget(ChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.messages.length != oldWidget.messages.length || widget.isStreaming) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _scrollToBottom();
+        }
+      });
     }
   }
 
@@ -121,6 +135,8 @@ class _ChatViewState extends State<ChatView> {
                   Expanded(
                     child: TextField(
                       controller: _inputController,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _handleSend(),
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
                         hintText: 'Nhập tin nhắn...',
@@ -131,14 +147,7 @@ class _ChatViewState extends State<ChatView> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_upward, color: Colors.white),
-                    onPressed: () {
-                      final text = _inputController.text.trim();
-                      if (text.isNotEmpty) {
-                        HapticFeedback.lightImpact();
-                        widget.onSendMessage(text);
-                        _inputController.clear();
-                      }
-                    },
+                    onPressed: _handleSend,
                   ),
                 ],
               ),

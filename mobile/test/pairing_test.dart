@@ -31,6 +31,18 @@ void main() {
       expect(payload.machineName, 'OpenMausBot Desktop');
       expect(payload.lanUrl, 'http://10.0.0.5:8810');
     });
+
+    test('PairingPayload parses openmausbot://pair URI format', () {
+      const rawUri =
+          'openmausbot://pair?address=192.168.1.80:8810&token=omb_pair_secret789&name=HomeServer&remoteUrl=https%3A%2F%2Fremote.omb%3A8810';
+      final payload = PairingPayload.fromJsonString(rawUri);
+      expect(payload.host, '192.168.1.80');
+      expect(payload.port, 8810);
+      expect(payload.remoteUrl, 'https://remote.omb:8810');
+      expect(payload.pairingSecret, 'omb_pair_secret789');
+      expect(payload.machineName, 'HomeServer');
+      expect(payload.lanUrl, 'http://192.168.1.80:8810');
+    });
   });
 
   group('PairingStorage', () {

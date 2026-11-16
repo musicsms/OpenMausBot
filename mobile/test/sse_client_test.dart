@@ -4,6 +4,17 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/network/sse_client.dart';
 
+class ClosableMockClient extends MockClient {
+  bool isClosed = false;
+  ClosableMockClient(super.fn);
+
+  @override
+  void close() {
+    isClosed = true;
+    super.close();
+  }
+}
+
 void main() {
   group('SseNetworkClient', () {
     test('parses SSE data chunks properly', () async {
@@ -89,6 +100,26 @@ void main() {
       );
     });
 
+    test('resolveActiveBaseUrl sends Authorization header during health check', () async {
+      String? capturedAuth;
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/healthz') {
+          capturedAuth = request.headers['authorization'];
+          return http.Response('{"status":"ok"}', 200);
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final sseClient = SseNetworkClient(
+        lanUrl: 'http://127.0.0.1:8810',
+        deviceToken: 'probe-secret-token',
+        httpClient: mockClient,
+      );
+
+      await sseClient.resolveActiveBaseUrl();
+      expect(capturedAuth, 'Bearer probe-secret-token');
+    });
+
     test('resolveActiveBaseUrl prefers LAN when health check succeeds', () async {
       final mockClient = MockClient((request) async {
         if (request.url.host == '192.168.1.100' && request.url.path == '/healthz') {
@@ -141,6 +172,27 @@ void main() {
 
       final activeUrl = await sseClient.resolveActiveBaseUrl();
       expect(activeUrl, 'http://192.168.1.100:8810');
+    });
+
+    test('strips trailing slashes from lanUrl and remoteUrl', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/healthz') {
+          return http.Response('{"status":"ok"}', 200);
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final sseClient = SseNetworkClient(
+        lanUrl: 'http://127.0.0.1:8810///',
+        remoteUrl: 'https://remote.example.com///',
+        deviceToken: 'test-tok',
+        httpClient: mockClient,
+      );
+
+      expect(sseClient.lanUrl, 'http://127.0.0.1:8810');
+      expect(sseClient.remoteUrl, 'https://remote.example.com');
+      final activeUrl = await sseClient.resolveActiveBaseUrl();
+      expect(activeUrl, 'http://127.0.0.1:8810');
     });
 
     test('postJson attaches headers, serializes body, and returns true on success', () async {
@@ -199,6 +251,24 @@ void main() {
       expect(success, isFalse);
     });
 
+    test('postJson returns false on network or transport exception', () async {
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/healthz') {
+          return http.Response('{"status":"ok"}', 200);
+        }
+        throw http.ClientException('Network down');
+      });
+
+      final sseClient = SseNetworkClient(
+        lanUrl: 'http://127.0.0.1:8810',
+        deviceToken: 'test-tok',
+        httpClient: mockClient,
+      );
+
+      final success = await sseClient.postJson('/api/broken', {'data': 1});
+      expect(success, isFalse);
+    });
+
     test('connectStream and resolveActiveEndpoint aliases function correctly', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/healthz') {
@@ -225,6 +295,19 @@ void main() {
 
       final chunks = await sseClient.connectStream('th-alias').toList();
       expect(chunks, ['alias-msg']);
+    });
+
+    test('close closes the underlying http client', () {
+      final mockClient = ClosableMockClient((request) async => http.Response('ok', 200));
+      final sseClient = SseNetworkClient(
+        lanUrl: 'http://127.0.0.1:8810',
+        deviceToken: 'test-tok',
+        httpClient: mockClient,
+      );
+
+      expect(mockClient.isClosed, isFalse);
+      sseClient.close();
+      expect(mockClient.isClosed, isTrue);
     });
   });
 }

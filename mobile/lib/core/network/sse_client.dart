@@ -9,16 +9,29 @@ class SseNetworkClient {
   final http.Client _client;
 
   SseNetworkClient({
-    required this.lanUrl,
-    this.remoteUrl,
+    required String lanUrl,
+    String? remoteUrl,
     required this.deviceToken,
     http.Client? httpClient,
-  }) : _client = httpClient ?? http.Client();
+  })  : lanUrl = _stripTrailingSlashes(lanUrl),
+        remoteUrl = remoteUrl != null ? _stripTrailingSlashes(remoteUrl) : null,
+        _client = httpClient ?? http.Client();
+
+  static String _stripTrailingSlashes(String url) {
+    var trimmed = url.trim();
+    while (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
+  }
 
   Future<String> resolveActiveBaseUrl() async {
     try {
       final res = await _client
-          .get(Uri.parse('$lanUrl/healthz'))
+          .get(
+            Uri.parse('$lanUrl/healthz'),
+            headers: {'Authorization': 'Bearer $deviceToken'},
+          )
           .timeout(const Duration(milliseconds: 1500));
       if (res.statusCode == 200) {
         return lanUrl;
@@ -67,19 +80,25 @@ class SseNetworkClient {
       streamMessages(threadId, lastEventId: lastEventId);
 
   Future<bool> postJson(String path, Map<String, dynamic> body) async {
-    final baseUrl = await resolveActiveBaseUrl();
-    final normalizedPath = path.startsWith('/') ? path : '/$path';
-    final uri = Uri.parse('$baseUrl$normalizedPath');
+    try {
+      final baseUrl = await resolveActiveBaseUrl();
+      final normalizedPath = path.startsWith('/') ? path : '/$path';
+      final uri = Uri.parse('$baseUrl$normalizedPath');
 
-    final res = await _client.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $deviceToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
+      final res = await _client.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $deviceToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
 
-    return res.statusCode >= 200 && res.statusCode < 300;
+      return res.statusCode >= 200 && res.statusCode < 300;
+    } catch (_) {
+      return false;
+    }
   }
+
+  void close() => _client.close();
 }

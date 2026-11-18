@@ -1,0 +1,82 @@
+# Flutter companion tests. Linux runs analyze + unit/widget tests.
+# Compiling ios/ (simulator, device, ipa) needs macOS + Xcode + CocoaPods —
+# see docs/mobile-flutter.md and scripts/build-mobile-ios.sh.
+name: Mobile Flutter
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "mobile/**"
+      - "scripts/build-mobile-apk.sh"
+      - "scripts/build-mobile-ios.sh"
+      - "docs/mobile-flutter.md"
+      - ".github/workflows/mobile-flutter.yml"
+  push:
+    branches: [main, uat]
+    paths:
+      - "mobile/**"
+      - "scripts/build-mobile-apk.sh"
+      - "scripts/build-mobile-ios.sh"
+      - "docs/mobile-flutter.md"
+      - ".github/workflows/mobile-flutter.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-flutter-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  flutter-test:
+    name: flutter test (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: pub get
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: analyze
+        working-directory: mobile
+        run: flutter analyze --no-fatal-infos
+
+      - name: test
+        working-directory: mobile
+        run: flutter test
+
+      - name: fake companion fixture
+        working-directory: mobile
+        run: node test/fixtures/verify-fake-companion.mjs
+
+      - name: note iOS build host
+        run: |
+          echo "iOS Runner / ipa builds require macOS + Xcode (docs/mobile-flutter.md)."
+          echo "This Linux job intentionally does not run flutter build ios."
+
+  ios-build-macos:
+    name: flutter build ios (macOS / Xcode)
+    # Opt-in: full iOS compile is slow and needs Apple tooling.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: build ios (no codesign)
+        run: ./scripts/build-mobile-ios.sh

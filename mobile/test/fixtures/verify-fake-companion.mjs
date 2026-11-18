@@ -40,14 +40,11 @@ const port = await new Promise((resolve, reject) => {
 const base = `http://127.0.0.1:${port}`;
 
 async function req(method, path, { body, auth } = {}) {
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const headers = auth ? { Authorization: `Bearer ${auth}` } : {};
+  const init = body
+    ? { method, headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    : { method, headers };
+  const res = await fetch(`${base}${path}`, init);
   const text = await res.text();
   let json = null;
   try {

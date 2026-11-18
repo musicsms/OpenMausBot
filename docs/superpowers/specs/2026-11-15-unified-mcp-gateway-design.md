@@ -1,7 +1,7 @@
 # Unified MCP Gateway Design: Direct Third-Party Integrations with Multi-Account Support
 
 - **Date:** 2026-11-15
-- **Status:** Approved
+- **Status:** Approved (implementation currently shipping as a **PAT / local-dev MVP** with bearer-gated loopback SSE; OAuth UI, live refresh registration, and AES-at-rest wiring are follow-up slices)
 - **Scope:** Architectural (System Design & Integration Subsystem)
 
 ---

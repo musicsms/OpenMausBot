@@ -10,8 +10,35 @@ import { CustomRestAdapter } from "./adapters/custom-rest-adapter.ts";
 import { createGatewayServer } from "./mcp/sse-server.ts";
 import type { GatewayConfig } from "./types.ts";
 
+function envFromPartialConfig(
+  customConfig?: Partial<GatewayConfig>,
+): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env };
+  if (!customConfig) {
+    return env;
+  }
+  if (customConfig.host !== undefined) {
+    env.HOST = customConfig.host;
+  }
+  if (customConfig.port !== undefined) {
+    env.PORT = String(customConfig.port);
+  }
+  if (customConfig.authDir !== undefined) {
+    env.AUTH_DIR = customConfig.authDir;
+  }
+  if (customConfig.internalKey !== undefined) {
+    env.GATEWAY_INTERNAL_KEY = customConfig.internalKey;
+  }
+  if (customConfig.webPanelEnabled === false) {
+    env.DISABLE_WEB_PANEL = "true";
+  } else if (customConfig.webPanelEnabled === true) {
+    env.DISABLE_WEB_PANEL = "false";
+  }
+  return env;
+}
+
 export async function bootstrap(customConfig?: Partial<GatewayConfig>) {
-  const baseConfig = loadConfig();
+  const baseConfig = loadConfig(envFromPartialConfig(customConfig));
   const config: GatewayConfig = { ...baseConfig, ...customConfig };
   const store = new AuthStore(config.authDir);
   await store.init();
@@ -32,7 +59,7 @@ export async function bootstrap(customConfig?: Partial<GatewayConfig>) {
     server.once("error", reject);
     server.listen(config.port, config.host, () => {
       server.off("error", reject);
-      console.log(`Unified MCP Gateway running at http://${config.host}:${config.port}`);
+      console.log(`Unified MCP Gateway (PAT MVP) running at http://${config.host}:${config.port}`);
       console.log(`- MCP SSE Endpoint: http://${config.host}:${config.port}/sse`);
       console.log(`- Web Dashboard:    http://${config.host}:${config.port}/`);
       console.log(`- Auth Directory:   ${config.authDir}`);

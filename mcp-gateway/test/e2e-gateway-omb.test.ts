@@ -10,6 +10,7 @@ import { McpRouter } from "../src/mcp/router.ts";
 import { GoogleAdapter } from "../src/adapters/google-adapter.ts";
 import { GitHubAdapter } from "../src/adapters/github-adapter.ts";
 import { createGatewayServer } from "../src/mcp/sse-server.ts";
+import { TEST_INTERNAL_KEY, sseAuthOptions, authHeaders } from "./test-auth.ts";
 
 describe("E2E Gateway -> OpenMausBot Client", () => {
   let testDir: string;
@@ -41,7 +42,7 @@ describe("E2E Gateway -> OpenMausBot Client", () => {
     });
 
     server = createGatewayServer(
-      { host: "127.0.0.1", port: 0, authDir: testDir, internalKey: "test", webPanelEnabled: false },
+      { host: "127.0.0.1", port: 0, authDir: testDir, internalKey: TEST_INTERNAL_KEY, webPanelEnabled: false },
       store,
       router,
     );
@@ -62,7 +63,7 @@ describe("E2E Gateway -> OpenMausBot Client", () => {
   });
 
   it("client connects to SSE, discovers namespaced tools across multi-accounts, and inspects schemas", async () => {
-    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`));
+    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), sseAuthOptions());
     const client = new Client({ name: "omb-client", version: "1.0.0" }, { capabilities: {} });
 
     await client.connect(transport);
@@ -100,7 +101,7 @@ describe("E2E Gateway -> OpenMausBot Client", () => {
       return originalFetch(input, init);
     });
 
-    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`));
+    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), sseAuthOptions());
     const client = new Client({ name: "omb-client", version: "1.0.0" }, { capabilities: {} });
 
     await client.connect(transport);
@@ -124,7 +125,7 @@ describe("E2E Gateway -> OpenMausBot Client", () => {
   });
 
   it("dynamically discovers new tools when accounts are added without server restart", async () => {
-    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`));
+    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), sseAuthOptions());
     const client = new Client({ name: "omb-client", version: "1.0.0" }, { capabilities: {} });
 
     await client.connect(transport);
@@ -147,6 +148,15 @@ describe("E2E Gateway -> OpenMausBot Client", () => {
     await client.close();
   });
 
+  it("rejects SSE clients that omit the gateway bearer", async () => {
+    const unauth = await fetch(`http://127.0.0.1:${port}/sse`);
+    expect(unauth.status).toBe(401);
+
+    const withBearer = await fetch(`http://127.0.0.1:${port}/sse`, { headers: authHeaders() });
+    expect(withBearer.status).toBe(200);
+    await withBearer.body?.cancel();
+  });
+
   it("propagates tool execution errors cleanly across SSE connection", async () => {
     const originalFetch = globalThis.fetch;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -160,7 +170,7 @@ describe("E2E Gateway -> OpenMausBot Client", () => {
       return originalFetch(input, init);
     });
 
-    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`));
+    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), sseAuthOptions());
     const client = new Client({ name: "omb-client", version: "1.0.0" }, { capabilities: {} });
 
     await client.connect(transport);

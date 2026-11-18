@@ -9,5 +9,7 @@ services:
       - PORT=8318
       - HOST=127.0.0.1
       - AUTH_DIR=/root/.mcp-gateway/auth
+      # Required: stable bearer shared with OpenMausBot MCP headers.
+      - GATEWAY_INTERNAL_KEY=${GATEWAY_INTERNAL_KEY:?set GATEWAY_INTERNAL_KEY}
     volumes:
       - ~/.mcp-gateway/auth:/root/.mcp-gateway/auth

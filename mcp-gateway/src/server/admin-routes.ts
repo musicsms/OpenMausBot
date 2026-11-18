@@ -3,12 +3,17 @@ import type { AuthStore } from "../storage/auth-store.ts";
 import type { AccountCredential, OAuthTokenRecord, ProviderType } from "../types.ts";
 import { KNOWN_PROVIDERS } from "../types.ts";
 import { renderDashboardHtml } from "./web-panel.ts";
+import { toPublicAccount } from "./account-public.ts";
+import { requireBearerAuth } from "./auth.ts";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const ACCOUNT_ITEM_ROUTE = /^\/api\/accounts\/([^/]+)\/([^/]+)\/?$/;
 
 export interface AdminRouteOptions {
   webPanelEnabled?: boolean;
+  internalKey: string;
+  /** When true, caller already enforced bearer auth (unified gateway server). */
+  skipAuth?: boolean;
 }
 
 class PayloadTooLargeError extends Error {
@@ -65,11 +70,21 @@ export async function handleAdminRequest(
   req: IncomingMessage,
   res: ServerResponse,
   store: AuthStore,
-  options?: AdminRouteOptions,
+  options: AdminRouteOptions,
 ): Promise<boolean> {
   const url = new URL(req.url || "/", "http://localhost");
   const pathname = url.pathname;
   const method = req.method?.toUpperCase() || "GET";
+
+  const isAdminPath =
+    pathname === "/" || pathname === "/api/accounts" || ACCOUNT_ITEM_ROUTE.test(pathname);
+  if (!isAdminPath) {
+    return false;
+  }
+
+  if (!options.skipAuth && !requireBearerAuth(req, res, options.internalKey)) {
+    return true;
+  }
 
   if (pathname === "/") {
     if (method !== "GET") {
@@ -77,7 +92,7 @@ export async function handleAdminRequest(
       res.end(JSON.stringify({ error: "Method not allowed" }));
       return true;
     }
-    if (options?.webPanelEnabled === false) {
+    if (options.webPanelEnabled === false) {
       sendJson(res, 404, { error: "Web panel disabled" });
       return true;
     }
@@ -95,7 +110,7 @@ export async function handleAdminRequest(
     if (method === "GET") {
       try {
         const accounts = await store.listAccounts();
-        sendJson(res, 200, accounts);
+        sendJson(res, 200, accounts.map(toPublicAccount));
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : "Internal server error" });
       }
@@ -151,7 +166,7 @@ export async function handleAdminRequest(
 
       try {
         await store.saveAccount(account);
-        sendJson(res, 201, { success: true, account });
+        sendJson(res, 201, { success: true, account: toPublicAccount(account) });
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : "Internal server error" });
       }
@@ -193,7 +208,7 @@ export async function handleAdminRequest(
       try {
         const account = await store.getAccount(provider, alias);
         if (account) {
-          sendJson(res, 200, account);
+          sendJson(res, 200, toPublicAccount(account));
         } else {
           sendJson(res, 404, { error: `Account ${provider}:${alias} not found` });
         }
@@ -213,12 +228,12 @@ export async function handleAdminRequest(
 
 export function createAdminHandler(
   store: AuthStore,
-  options?: AdminRouteOptions,
+  options: AdminRouteOptions,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
   return (req: IncomingMessage, res: ServerResponse) => handleAdminRequest(req, res, store, options);
 }
 
-export function createAdminServer(store: AuthStore, options?: AdminRouteOptions): Server {
+export function createAdminServer(store: AuthStore, options: AdminRouteOptions): Server {
   return createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const handled = await handleAdminRequest(req, res, store, options);

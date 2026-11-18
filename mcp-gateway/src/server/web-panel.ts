@@ -1,6 +1,6 @@
 import type { AccountCredential } from "../types.ts";
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -40,7 +40,7 @@ export function renderDashboardHtml(accounts: AccountCredential[]): string {
 <body>
   <div class="card">
     <h1>Unified MCP Gateway</h1>
-    <p>Direct Multi-Account Integrations for OpenMausBot (Port 8318)</p>
+    <p>Local PAT MVP dashboard for OpenMausBot (loopback; bearer required on API)</p>
     <h2>Connected Accounts</h2>
     <table>
       <thead>

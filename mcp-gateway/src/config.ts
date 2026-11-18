@@ -16,10 +16,18 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const internalKey = (env.GATEWAY_INTERNAL_KEY || "").trim();
   const webPanelEnabled = env.DISABLE_WEB_PANEL !== "true";
   const allowNonLoopback = env.GATEWAY_ALLOW_NON_LOOPBACK === "1";
+  const authEncryptionKey = (env.AUTH_ENCRYPTION_KEY || "").trim() || undefined;
+  const encryptionRequired = env.AUTH_ENCRYPTION_REQUIRED === "1";
 
   if (!internalKey) {
     throw new Error(
       "GATEWAY_INTERNAL_KEY is required. Set a stable secret in the environment before starting the gateway.",
+    );
+  }
+
+  if (encryptionRequired && !authEncryptionKey) {
+    throw new Error(
+      "AUTH_ENCRYPTION_REQUIRED=1 but AUTH_ENCRYPTION_KEY is missing. Set AUTH_ENCRYPTION_KEY or unset AUTH_ENCRYPTION_REQUIRED.",
     );
   }
 
@@ -29,5 +37,5 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     );
   }
 
-  return { host, port, authDir, internalKey, webPanelEnabled };
+  return { host, port, authDir, internalKey, webPanelEnabled, authEncryptionKey };
 }

@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderDashboardHtml } from "../src/server/web-panel.ts";
 import { handleAdminRequest, createAdminHandler, createAdminServer } from "../src/server/admin-routes.ts";
 import { AuthStore } from "../src/storage/auth-store.ts";
+import { OAuthSessionManager } from "../src/auth/oauth-sessions.ts";
 import { TEST_INTERNAL_KEY, authHeaders } from "./test-auth.ts";
 
 describe("Web Panel", () => {
@@ -16,6 +17,8 @@ describe("Web Panel", () => {
     expect(html).toContain("Unified MCP Gateway");
     expect(html).toContain("google");
     expect(html).toContain("work");
+    expect(html).toContain("Connect Google");
+    expect(html).toContain('id="connect-google"');
   });
 
   it("renders empty state message when no accounts are connected", () => {
@@ -85,9 +88,26 @@ describe("Admin API Routes", () => {
     store = new AuthStore(tempDir);
     await store.init();
     webPanelEnabled = true;
+    const oauthSessions = new OAuthSessionManager({
+      store,
+      resolveClient: () => ({ clientId: "test-client", clientSecret: "test-secret" }),
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            access_token: "ya29.admin",
+            refresh_token: "1//admin",
+            expires_in: 3600,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    });
 
     server = createServer(async (req, res) => {
-      const handler = createAdminHandler(store, { webPanelEnabled, internalKey: TEST_INTERNAL_KEY });
+      const handler = createAdminHandler(store, {
+        webPanelEnabled,
+        internalKey: TEST_INTERNAL_KEY,
+        oauthSessions,
+      });
       const handled = await handler(req, res);
       if (!handled) {
         res.writeHead(404, { "Content-Type": "application/json" });
@@ -366,6 +386,35 @@ describe("Admin API Routes", () => {
     expect(res.status).toBe(401);
     const data = await res.json();
     expect(data.error).toBe("Unauthorized");
+  });
+
+  it("starts Google OAuth via POST /api/oauth/google/start and completes on callback", async () => {
+    const startRes = await fetch(`${baseUrl}/api/oauth/google/start`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ alias: "work" }),
+    });
+    expect(startRes.status).toBe(201);
+    const startData = await startRes.json();
+    expect(startData.sessionId).toBeTruthy();
+    expect(startData.authorizeUrl).toContain("accounts.google.com");
+
+    const redirectUri = new URL(startData.authorizeUrl).searchParams.get("redirect_uri");
+    expect(redirectUri).toBeTruthy();
+    const callbackRes = await fetch(`${redirectUri}?code=admin-code`);
+    expect(callbackRes.status).toBe(200);
+
+    await vi.waitFor(async () => {
+      const statusRes = await fetch(`${baseUrl}/api/oauth/google/status/${startData.sessionId}`, {
+        headers: authHeaders(),
+      });
+      expect(statusRes.status).toBe(200);
+      const statusData = await statusRes.json();
+      expect(statusData.status).toBe("completed");
+    });
+
+    const saved = await store.getAccount("google", "work");
+    expect(saved?.tokens?.accessToken).toBe("ya29.admin");
   });
 
   it("does not echo secrets on POST /api/accounts", async () => {

@@ -305,6 +305,7 @@ describe("TokenRefresher", () => {
 
   it("isolates refresh failure of one account so subsequent accounts continue refreshing during background sync", async () => {
     vi.useFakeTimers();
+    const logs: string[] = [];
 
     const mockRefresherFn = vi.fn().mockImplementation(async (token: string) => {
       if (token === "failing-token") {
@@ -321,6 +322,7 @@ describe("TokenRefresher", () => {
         google: mockRefresherFn,
       },
       store,
+      (message) => logs.push(message),
     );
 
     await store.saveAccount({
@@ -354,6 +356,10 @@ describe("TokenRefresher", () => {
 
     const updatedAccount2 = await store.getAccount("google", "account2-succeeds");
     expect(updatedAccount2?.tokens?.accessToken).toBe("refreshed-success-token");
+    expect(logs.some((line) => line.includes("google:account1-fails") && line.includes("Provider 500 error"))).toBe(
+      true,
+    );
+    expect(logs.every((line) => !line.includes("failing-token") && !line.includes("success-token"))).toBe(true);
 
     refresher.stopBackgroundSync();
   });

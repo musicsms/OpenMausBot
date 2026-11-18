@@ -2,6 +2,7 @@ import { loadConfig } from "./config.ts";
 import { AuthStore } from "./storage/auth-store.ts";
 import type { GatewayConfig, ProviderType } from "./types.ts";
 import { KNOWN_PROVIDERS } from "./types.ts";
+import { runGoogleOAuthConsent } from "./auth/google-consent.ts";
 
 export interface CliIo {
   log: (...args: unknown[]) => void;
@@ -16,14 +17,20 @@ export async function runCli(
     config?: GatewayConfig;
     store?: AuthStore;
     io?: Partial<CliIo>;
+    env?: Record<string, string | undefined>;
+    openUrl?: (url: string) => void | Promise<void>;
+    fetchImpl?: typeof fetch;
+    runGoogleConsent?: typeof runGoogleOAuthConsent;
   },
 ): Promise<number> {
-  const config = deps?.config ?? loadConfig();
-  const store = deps?.store ?? new AuthStore(config.authDir);
+  const env = deps?.env ?? process.env;
+  const config = deps?.config ?? loadConfig(env);
+  const store = deps?.store ?? new AuthStore(config.authDir, config.authEncryptionKey);
   const log = deps?.io?.log ?? console.log;
   const error = deps?.io?.error ?? console.error;
   const table = deps?.io?.table ?? console.table;
   const exit = deps?.io?.exit;
+  const runConsent = deps?.runGoogleConsent ?? runGoogleOAuthConsent;
 
   const command = args[0];
 
@@ -85,8 +92,28 @@ export async function runCli(
       return 0;
     }
 
+    if (provider === "google") {
+      try {
+        await runConsent({
+          store,
+          alias,
+          env,
+          log,
+          openUrl: deps?.openUrl,
+          fetchImpl: deps?.fetchImpl,
+        });
+        return 0;
+      } catch (err) {
+        error(err instanceof Error ? err.message : String(err));
+        if (exit) {
+          exit(1);
+        }
+        return 1;
+      }
+    }
+
     error(
-      `OAuth consent is not available in this PAT MVP build. Use: mcp-gateway auth ${provider} --alias ${alias} --pat <token>`,
+      `OAuth consent for "${provider}" is not wired yet. Use: mcp-gateway auth ${provider} --alias ${alias} --pat <token>`,
     );
     if (exit) {
       exit(1);
@@ -94,7 +121,7 @@ export async function runCli(
     return 1;
   }
 
-  log("Commands: list, auth <provider> --alias <name>");
+  log("Commands: list, auth <provider> --alias <name> [--pat <token>]");
   return 0;
 }
 

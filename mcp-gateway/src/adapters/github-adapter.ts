@@ -1,5 +1,13 @@
 import type { GatewayToolDefinition, ServiceAdapter } from "./base-adapter.ts";
 import type { ProviderType } from "../types.ts";
+import { requireAccountToken, throwForUpstreamStatus } from "../errors.ts";
+import { fetchWith429Retry, readRetryAfterSeconds } from "../http-retry.ts";
+import {
+  githubCreateIssueSchema,
+  githubGetIssueSchema,
+  githubListReposSchema,
+  parseToolArgs,
+} from "../tool-args.ts";
 
 export class GitHubAdapter implements ServiceAdapter {
   readonly provider: ProviderType = "github";
@@ -17,11 +25,11 @@ export class GitHubAdapter implements ServiceAdapter {
           },
         },
         execute: async (args, cred) => {
-          const token = cred.apiKey || cred.tokens?.accessToken;
-          if (!token) throw new Error(`Missing token for account '${alias}'`);
+          const token = requireAccountToken(cred);
+          const parsed = parseToolArgs(githubListReposSchema, args);
 
-          const visibility = typeof args.visibility === "string" ? args.visibility : "all";
-          const perPage = typeof args.perPage === "number" && args.perPage > 0 ? args.perPage : 10;
+          const visibility = parsed.visibility ?? "all";
+          const perPage = parsed.perPage && parsed.perPage > 0 ? parsed.perPage : 10;
           const params = new URLSearchParams({
             sort: "updated",
             per_page: String(perPage),
@@ -29,7 +37,7 @@ export class GitHubAdapter implements ServiceAdapter {
           });
           const url = `https://api.github.com/user/repos?${params.toString()}`;
 
-          const res = await fetch(url, {
+          const res = await fetchWith429Retry(url, {
             headers: {
               Authorization: `Bearer ${token}`,
               "User-Agent": "OpenMausBot-Unified-Gateway",
@@ -38,7 +46,14 @@ export class GitHubAdapter implements ServiceAdapter {
           });
 
           if (!res.ok) {
-            throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "github",
+              alias,
+              res.status,
+              await res.text(),
+              "GitHub",
+              readRetryAfterSeconds(res),
+            );
           }
 
           const repos = (await res.json()) as Array<{ full_name: string; html_url: string; private: boolean }>;
@@ -68,19 +83,12 @@ export class GitHubAdapter implements ServiceAdapter {
           required: ["owner", "repo", "issue_number"],
         },
         execute: async (args, cred) => {
-          const token = cred.apiKey || cred.tokens?.accessToken;
-          if (!token) throw new Error(`Missing token for account '${alias}'`);
-          if (!args.owner || typeof args.owner !== "string") throw new Error("Missing required argument 'owner'");
-          if (!args.repo || typeof args.repo !== "string") throw new Error("Missing required argument 'repo'");
-          const issueNum =
-            typeof args.issue_number === "string" ? parseInt(args.issue_number, 10) : args.issue_number;
-          if (issueNum === undefined || typeof issueNum !== "number" || Number.isNaN(issueNum)) {
-            throw new Error("Missing required argument 'issue_number'");
-          }
+          const token = requireAccountToken(cred);
+          const parsed = parseToolArgs(githubGetIssueSchema, args);
 
-          const url = `https://api.github.com/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/issues/${encodeURIComponent(String(issueNum))}`;
+          const url = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}/issues/${encodeURIComponent(String(parsed.issue_number))}`;
 
-          const res = await fetch(url, {
+          const res = await fetchWith429Retry(url, {
             headers: {
               Authorization: `Bearer ${token}`,
               "User-Agent": "OpenMausBot-Unified-Gateway",
@@ -89,7 +97,14 @@ export class GitHubAdapter implements ServiceAdapter {
           });
 
           if (!res.ok) {
-            throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "github",
+              alias,
+              res.status,
+              await res.text(),
+              "GitHub",
+              readRetryAfterSeconds(res),
+            );
           }
 
           const issue = (await res.json()) as {
@@ -129,15 +144,12 @@ export class GitHubAdapter implements ServiceAdapter {
           required: ["owner", "repo", "title"],
         },
         execute: async (args, cred) => {
-          const token = cred.apiKey || cred.tokens?.accessToken;
-          if (!token) throw new Error(`Missing token for account '${alias}'`);
-          if (!args.owner || typeof args.owner !== "string") throw new Error("Missing required argument 'owner'");
-          if (!args.repo || typeof args.repo !== "string") throw new Error("Missing required argument 'repo'");
-          if (!args.title || typeof args.title !== "string") throw new Error("Missing required argument 'title'");
+          const token = requireAccountToken(cred);
+          const parsed = parseToolArgs(githubCreateIssueSchema, args);
 
-          const url = `https://api.github.com/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/issues`;
+          const url = `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}/issues`;
 
-          const res = await fetch(url, {
+          const res = await fetchWith429Retry(url, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -146,13 +158,20 @@ export class GitHubAdapter implements ServiceAdapter {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              title: args.title,
-              ...(typeof args.body === "string" ? { body: args.body } : {}),
+              title: parsed.title,
+              ...(parsed.body !== undefined ? { body: parsed.body } : {}),
             }),
           });
 
           if (!res.ok) {
-            throw new Error(`GitHub API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "github",
+              alias,
+              res.status,
+              await res.text(),
+              "GitHub",
+              readRetryAfterSeconds(res),
+            );
           }
 
           const issue = (await res.json()) as { number: number; html_url: string; title: string };

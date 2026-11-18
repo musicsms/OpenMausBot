@@ -26,4 +26,6 @@ export interface GatewayConfig {
   authDir: string;
   internalKey: string;
   webPanelEnabled: boolean;
+  /** When set, AuthStore encrypts credential files with AES-256-GCM. */
+  authEncryptionKey?: string;
 }

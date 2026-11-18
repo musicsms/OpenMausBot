@@ -7,6 +7,8 @@ import type { AuthStore } from "../storage/auth-store.ts";
 import type { McpRouter } from "./router.ts";
 import { handleAdminRequest } from "../server/admin-routes.ts";
 import { requireBearerAuth } from "../server/auth.ts";
+import { GatewayToolError } from "../errors.ts";
+import type { OAuthSessionManager } from "../auth/oauth-sessions.ts";
 
 function createMcpServer(store: AuthStore, router: McpRouter): Server {
   const mcpServer = new Server(
@@ -28,14 +30,28 @@ function createMcpServer(store: AuthStore, router: McpRouter): Server {
 
   mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     const accounts = await store.listAccounts();
-    const result = await router.executeTool(
-      request.params.name,
-      (request.params.arguments as Record<string, unknown>) || {},
-      accounts,
-    );
-    return {
-      content: [{ type: "text", text: result.text }],
-    };
+    try {
+      const result = await router.executeTool(
+        request.params.name,
+        (request.params.arguments as Record<string, unknown>) || {},
+        accounts,
+      );
+      return {
+        content: [{ type: "text", text: result.text }],
+      };
+    } catch (err) {
+      if (err instanceof GatewayToolError) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: JSON.stringify(err.toPublicPayload()) }],
+        };
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        isError: true,
+        content: [{ type: "text", text: message }],
+      };
+    }
   });
 
   return mcpServer;
@@ -45,6 +61,7 @@ export function createGatewayServer(
   config: GatewayConfig,
   store: AuthStore,
   router: McpRouter,
+  options?: { oauthSessions?: OAuthSessionManager },
 ): HttpServer {
   const transports = new Map<string, SSEServerTransport>();
 
@@ -107,6 +124,7 @@ export function createGatewayServer(
         webPanelEnabled: config.webPanelEnabled,
         internalKey: config.internalKey,
         skipAuth: true,
+        oauthSessions: options?.oauthSessions,
       });
       if (handled) {
         return;

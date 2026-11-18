@@ -73,9 +73,10 @@ describe("Slack, Notion, and Custom Adapters", () => {
         updatedAt: Date.now(),
       };
 
-      await expect(postTool.execute({ channel: "#general", text: "hi" }, noTokenCred)).rejects.toThrow(
-        "Missing token for account 'eng'",
-      );
+      await expect(postTool.execute({ channel: "#general", text: "hi" }, noTokenCred)).rejects.toMatchObject({
+        code: "auth_required",
+        details: { provider: "slack", alias: "eng" },
+      });
 
       const validCred: AccountCredential = {
         provider: "slack",
@@ -85,13 +86,13 @@ describe("Slack, Notion, and Custom Adapters", () => {
         tokens: { accessToken: "xoxp-oauth-token" },
       };
 
-      await expect(postTool.execute({ channel: "", text: "hi" }, validCred)).rejects.toThrow(
-        "Missing required argument 'channel'",
-      );
+      await expect(postTool.execute({ channel: "", text: "hi" }, validCred)).rejects.toMatchObject({
+        code: "invalid_params",
+      });
 
-      await expect(postTool.execute({ channel: "C1" }, validCred)).rejects.toThrow(
-        "Missing required argument 'text'",
-      );
+      await expect(postTool.execute({ channel: "C1" }, validCred)).rejects.toMatchObject({
+        code: "invalid_params",
+      });
 
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -154,7 +155,10 @@ describe("Slack, Notion, and Custom Adapters", () => {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
-      await expect(listTool.execute({}, noTokenCred)).rejects.toThrow("Missing token for account 'team'");
+      await expect(listTool.execute({}, noTokenCred)).rejects.toMatchObject({
+        code: "auth_required",
+        details: { provider: "slack", alias: "team" },
+      });
 
       const validCred: AccountCredential = {
         provider: "slack",
@@ -272,12 +276,13 @@ describe("Slack, Notion, and Custom Adapters", () => {
         updatedAt: Date.now(),
       };
 
-      await expect(searchTool.execute({ query: "test" }, noTokenCred)).rejects.toThrow(
-        "Missing token for account 'corp'",
-      );
-      await expect(queryTool.execute({ database_id: "db1" }, noTokenCred)).rejects.toThrow(
-        "Missing token for account 'corp'",
-      );
+      await expect(searchTool.execute({ query: "test" }, noTokenCred)).rejects.toMatchObject({
+        code: "auth_required",
+        details: { provider: "notion", alias: "corp" },
+      });
+      await expect(queryTool.execute({ database_id: "db1" }, noTokenCred)).rejects.toMatchObject({
+        code: "auth_required",
+      });
 
       const validCred: AccountCredential = {
         provider: "notion",
@@ -287,8 +292,8 @@ describe("Slack, Notion, and Custom Adapters", () => {
         apiKey: "secret_key",
       };
 
-      await expect(searchTool.execute({}, validCred)).rejects.toThrow("Missing required argument 'query'");
-      await expect(queryTool.execute({}, validCred)).rejects.toThrow("Missing required argument 'database_id'");
+      await expect(searchTool.execute({}, validCred)).rejects.toMatchObject({ code: "invalid_params" });
+      await expect(queryTool.execute({}, validCred)).rejects.toMatchObject({ code: "invalid_params" });
 
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -297,9 +302,10 @@ describe("Slack, Notion, and Custom Adapters", () => {
         text: async () => "Could not find database with ID",
       });
 
-      await expect(queryTool.execute({ database_id: "invalid_id" }, validCred)).rejects.toThrow(
-        "Notion API error (404): Could not find database with ID",
-      );
+      await expect(queryTool.execute({ database_id: "invalid_id" }, validCred)).rejects.toMatchObject({
+        code: "upstream_error",
+        message: expect.stringContaining("Notion API error (404)"),
+      });
     });
   });
 

@@ -3,18 +3,23 @@ import type { AuthStore } from "../storage/auth-store.ts";
 
 export type RefreshHandler = (refreshToken: string, metadata?: Record<string, unknown>) => Promise<OAuthTokenRecord>;
 
+export type RefreshLog = (message: string) => void;
+
 export class TokenRefresher {
   private timer: NodeJS.Timeout | null = null;
   private readonly EXPIRY_BUFFER_MS = 5 * 60 * 1000;
   private readonly handlers: Partial<Record<ProviderType, RefreshHandler>>;
   private readonly store?: AuthStore;
+  private readonly log: RefreshLog;
 
   constructor(
     handlers: Partial<Record<ProviderType, RefreshHandler>>,
     store?: AuthStore,
+    log: RefreshLog = console.error,
   ) {
     this.handlers = handlers;
     this.store = store;
+    this.log = log;
   }
 
   async refreshTokenIfNeeded(account: AccountCredential): Promise<AccountCredential> {
@@ -56,9 +61,17 @@ export class TokenRefresher {
         for (const account of accounts) {
           try {
             await this.refreshTokenIfNeeded(account);
-          } catch {}
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log(
+              `Token refresh failed for ${account.provider}:${account.alias}: ${message}`,
+            );
+          }
         }
-      } catch {}
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.log(`Token refresh background sync failed: ${message}`);
+      }
     }, intervalMs);
     this.timer.unref?.();
   }

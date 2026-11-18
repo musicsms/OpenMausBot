@@ -23,8 +23,35 @@ Companion LAN and Tailscale MagicDNS routes are cleartext HTTP on `:8810`.
 Hosted remote access is HTTPS (`c-*.openmausbot.com`).
 
 - Android: `usesCleartextTraffic` + `network_security_config.xml`
-- iOS: `NSAllowsLocalNetworking`, plus ATS exception domains for `ts.net` and
-  `local`, camera + local-network privacy strings, and `_openmausbot._tcp`
+- iOS: `NSAllowsLocalNetworking` for same-LAN / link-local HTTP, camera +
+  local-network privacy strings, and an ATS exception for `*.ts.net`
+  (`NSExceptionAllowsInsecureHTTPLoads`).
+
+**Accepted risk (`*.ts.net`):** MagicDNS hostnames are not covered by
+`NSAllowsLocalNetworking`, so plaintext HTTP to every `*.ts.net` host is
+allowed. Tailnet traffic is already WireGuard-encrypted; narrow or drop this
+exception if pairing can use HTTPS MagicDNS certificates later. There is no
+Bonjour browse yet — `NSBonjourServices` is intentionally omitted until
+discovery lands; keep `NSLocalNetworkUsageDescription` for LAN IP access.
+
+## Verify iOS (macOS / CI)
+
+Linux CI runs `flutter analyze`, `flutter test`, and the fake companion
+fixture only. Compiling the Runner needs macOS + Xcode + CocoaPods.
+
+1. **Script PATH check** (macOS):  
+   `FLUTTER_BIN=/path/to/flutter/bin ./scripts/build-mobile-ios.sh`  
+   Confirm `command -v flutter`, `command -v pod`, and `command -v xcodebuild`
+   all succeed after the script prepends `FLUTTER_BIN` (it must not replace
+   the whole `PATH`).
+2. **Release build** (macOS or GitHub Actions):  
+   `./scripts/build-mobile-ios.sh`  
+   or dispatch the `Mobile Flutter` workflow so job `ios-build-macos` runs
+   (`workflow_dispatch` only — not on every PR). Expect
+   `flutter build ios --release --no-codesign` to finish.
+3. **Device smoke** (optional, real iPhone): pair over LAN IP and over
+   Tailscale MagicDNS; confirm the local-network prompt text and that ATS
+   still allows both routes after the tightened exceptions.
 
 ## Contract (do not invent)
 

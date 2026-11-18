@@ -62,10 +62,15 @@ flutter run -d <ios-device-id>
 `Info.plist` enables:
 
 - **ATS** `NSAllowsLocalNetworking` for same-LAN HTTP
-- insecure HTTP exceptions for `*.ts.net` (Tailscale MagicDNS) and `*.local` (Bonjour)
-- camera (QR), local-network usage, and `_openmausbot._tcp` Bonjour
+- insecure HTTP exception for `*.ts.net` (Tailscale MagicDNS; accepted risk —
+  see `docs/mobile-flutter.md`)
+- camera (QR) and local-network usage strings (no Bonjour services until
+  discovery exists)
 
 Hosted `https://c-*.openmausbot.com` uses normal ATS TLS verification.
+
+iOS compile is macOS-only; see **Verify iOS** in `docs/mobile-flutter.md`
+(including `FLUTTER_BIN` PATH prepend and `ios-build-macos` workflow_dispatch).
 
 ## Tests (isolated)
 

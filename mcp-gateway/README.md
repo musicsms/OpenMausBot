@@ -30,8 +30,14 @@ Endpoints (default `http://127.0.0.1:8318`):
 | Path | Auth | Purpose |
 | --- | --- | --- |
 | `/healthz` | none | liveness |
+| `/oauth/google/callback` | none (browser redirect) | Google OAuth callback for dashboard Connect |
 | `/sse`, `/message` | `Authorization: Bearer <GATEWAY_INTERNAL_KEY>` | MCP SSE |
 | `/`, `/api/*` | same bearer | admin dashboard + account / OAuth API |
+
+Set `PUBLIC_BASE_URL` (e.g. `http://127.0.0.1:8318`) when the browser-reachable
+origin differs from `HOST` (Docker / published port). Register that same origin
+plus `/oauth/google/callback` as the Google Console redirect URI for dashboard
+Connect. The CLI consent flow still uses an ephemeral loopback `/callback`.
 
 Bind stays on loopback. Non-loopback `HOST` is rejected unless
 `GATEWAY_ALLOW_NON_LOOPBACK=1` is set **and** `GATEWAY_INTERNAL_KEY` is present.
@@ -52,9 +58,11 @@ export GOOGLE_CLIENT_SECRET=...
 pnpm --filter mcp-gateway cli -- auth google --alias work
 ```
 
-The CLI starts a loopback callback, prints an authorize URL, exchanges the
-code, and saves tokens under `AUTH_DIR`. The dashboard “Connect Google”
-control uses `POST /api/oauth/google/start` + status polling the same way.
+The CLI starts a loopback callback with OAuth `state` + PKCE (S256), prints an
+authorize URL, exchanges the code with `code_verifier`, and saves tokens under
+`AUTH_DIR`. The dashboard “Connect Google” control uses
+`POST /api/oauth/google/start` + status polling and completes on the gateway’s
+published `/oauth/google/callback` (same `state` + PKCE).
 
 Admin HTTP also accepts `POST /api/accounts` with a bearer, but responses never
 echo `apiKey` or OAuth tokens — only metadata such as `hasApiKey` /
@@ -62,8 +70,10 @@ echo `apiKey` or OAuth tokens — only metadata such as `hasApiKey` /
 
 Credentials live under `AUTH_DIR` as `0600` files. Without
 `AUTH_ENCRYPTION_KEY` they are plaintext JSON (v1 posture). With the key set,
-saves are AES-256-GCM; existing plaintext files still load and are rewritten
-encrypted on the next save.
+saves are AES-256-GCM; `init()` / `listAccounts()` migrates existing plaintext
+files to encrypted form with an atomic replace. A wrong key surfaces
+`unreadable` entries on `/api/accounts` and CLI `list` instead of silently
+dropping accounts.
 
 Google refresh tokens are refreshed in the background when a handler is
 registered at bootstrap (Google is wired; missing handlers no-op safely).

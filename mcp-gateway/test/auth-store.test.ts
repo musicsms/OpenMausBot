@@ -149,7 +149,7 @@ describe("AuthStore encryption", () => {
     expect(retrieved?.tokens?.refreshToken).toBe("ref-enc");
   });
 
-  it("loads plaintext files and rewrites them encrypted on next save", async () => {
+  it("migrates plaintext files to encrypted on init without a separate save", async () => {
     await writeFile(
       join(testDir, "google_legacy.json"),
       JSON.stringify({
@@ -163,17 +163,36 @@ describe("AuthStore encryption", () => {
     );
 
     const store = new AuthStore(testDir, secretKey);
-    const loaded = await store.getAccount("google", "legacy");
-    expect(loaded?.tokens?.accessToken).toBe("plain-token");
-
-    await store.saveAccount({
-      ...loaded!,
-      updatedAt: 2,
-    });
+    await store.init();
 
     const raw = await readFile(join(testDir, "google_legacy.json"), "utf-8");
     expect(raw).not.toContain("plain-token");
-    expect((await store.getAccount("google", "legacy"))?.tokens?.accessToken).toBe("plain-token");
+    expect(raw.trim().startsWith("{")).toBe(false);
+
+    const accounts = await store.listAccounts();
+    expect(accounts).toHaveLength(1);
+    expect(accounts[0].tokens?.accessToken).toBe("plain-token");
+  });
+
+  it("surfaces unreadable entries when the encryption key is wrong", async () => {
+    const writer = new AuthStore(testDir, secretKey);
+    await writer.saveAccount({
+      provider: "google",
+      alias: "work",
+      createdAt: 1,
+      updatedAt: 1,
+      tokens: { accessToken: "tok-enc" },
+    });
+
+    const reader = new AuthStore(testDir, "wrong-key-that-does-not-match-at-all!!");
+    const entries = await reader.listAccountEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].kind).toBe("unreadable");
+    if (entries[0].kind === "unreadable") {
+      expect(entries[0].entry.reason).toBe("decrypt_failed");
+      expect(entries[0].entry.file).toBe("google_work.json");
+    }
+    expect(await reader.listAccounts()).toEqual([]);
   });
 
   it("keeps plaintext posture when no encryption key is configured", async () => {

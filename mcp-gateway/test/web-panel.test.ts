@@ -329,7 +329,7 @@ describe("Admin API Routes", () => {
   });
 
   it("handles internal errors with 500 response", async () => {
-    vi.spyOn(store, "listAccounts").mockRejectedValueOnce(new Error("disk read failure"));
+    vi.spyOn(store, "listAccountEntries").mockRejectedValueOnce(new Error("disk read failure"));
     const res = await fetch(`${baseUrl}/api/accounts`, { headers: authHeaders() });
     expect(res.status).toBe(500);
     const data = await res.json();
@@ -388,7 +388,7 @@ describe("Admin API Routes", () => {
     expect(data.error).toBe("Unauthorized");
   });
 
-  it("starts Google OAuth via POST /api/oauth/google/start and completes on callback", async () => {
+  it("starts Google OAuth via POST /api/oauth/google/start and completes on gateway callback", async () => {
     const startRes = await fetch(`${baseUrl}/api/oauth/google/start`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
@@ -399,22 +399,45 @@ describe("Admin API Routes", () => {
     expect(startData.sessionId).toBeTruthy();
     expect(startData.authorizeUrl).toContain("accounts.google.com");
 
-    const redirectUri = new URL(startData.authorizeUrl).searchParams.get("redirect_uri");
-    expect(redirectUri).toBeTruthy();
-    const callbackRes = await fetch(`${redirectUri}?code=admin-code`);
+    const authorize = new URL(startData.authorizeUrl);
+    expect(authorize.searchParams.get("code_challenge_method")).toBe("S256");
+    const redirectUri = authorize.searchParams.get("redirect_uri");
+    const state = authorize.searchParams.get("state");
+    expect(redirectUri).toBe(`${baseUrl}/oauth/google/callback`);
+    expect(state).toBeTruthy();
+
+    const callbackRes = await fetch(
+      `${redirectUri}?code=admin-code&state=${encodeURIComponent(state!)}`,
+    );
     expect(callbackRes.status).toBe(200);
 
-    await vi.waitFor(async () => {
-      const statusRes = await fetch(`${baseUrl}/api/oauth/google/status/${startData.sessionId}`, {
-        headers: authHeaders(),
-      });
-      expect(statusRes.status).toBe(200);
-      const statusData = await statusRes.json();
-      expect(statusData.status).toBe("completed");
+    const statusRes = await fetch(`${baseUrl}/api/oauth/google/status/${startData.sessionId}`, {
+      headers: authHeaders(),
     });
+    expect(statusRes.status).toBe(200);
+    const statusData = await statusRes.json();
+    expect(statusData.status).toBe("completed");
 
     const saved = await store.getAccount("google", "work");
     expect(saved?.tokens?.accessToken).toBe("ya29.admin");
+  });
+
+  it("allows Google OAuth callback without bearer auth", async () => {
+    const startRes = await fetch(`${baseUrl}/api/oauth/google/start`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ alias: "anon" }),
+    });
+    const startData = await startRes.json();
+    const authorize = new URL(startData.authorizeUrl);
+    const redirectUri = authorize.searchParams.get("redirect_uri")!;
+    const state = authorize.searchParams.get("state")!;
+
+    const callbackRes = await fetch(
+      `${redirectUri}?code=anon-code&state=${encodeURIComponent(state)}`,
+    );
+    expect(callbackRes.status).toBe(200);
+    expect(callbackRes.headers.get("content-type")).toContain("text/html");
   });
 
   it("does not echo secrets on POST /api/accounts", async () => {

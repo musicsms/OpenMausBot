@@ -75,6 +75,27 @@ export function createGatewayServer(
       return;
     }
 
+    // Google redirects the browser here; must stay unauthenticated.
+    if (url.pathname === "/oauth/google/callback") {
+      try {
+        await handleAdminRequest(req, res, store, {
+          webPanelEnabled: config.webPanelEnabled,
+          internalKey: config.internalKey,
+          skipAuth: true,
+          oauthSessions: options?.oauthSessions,
+          publicBaseUrl: config.publicBaseUrl,
+        });
+      } catch (err) {
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ error: err instanceof Error ? err.message : "Internal server error" }),
+          );
+        }
+      }
+      return;
+    }
+
     if (!requireBearerAuth(req, res, config.internalKey)) {
       return;
     }
@@ -125,6 +146,7 @@ export function createGatewayServer(
         internalKey: config.internalKey,
         skipAuth: true,
         oauthSessions: options?.oauthSessions,
+        publicBaseUrl: config.publicBaseUrl,
       });
       if (handled) {
         return;

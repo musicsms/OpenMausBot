@@ -39,6 +39,9 @@ function envFromPartialConfig(
   } else if (customConfig.webPanelEnabled === true) {
     env.DISABLE_WEB_PANEL = "false";
   }
+  if (customConfig.publicBaseUrl !== undefined) {
+    env.PUBLIC_BASE_URL = customConfig.publicBaseUrl;
+  }
   return env;
 }
 
@@ -64,7 +67,15 @@ export async function bootstrap(customConfig?: Partial<GatewayConfig>) {
     custom: new CustomRestAdapter(),
   });
 
-  const oauthSessions = new OAuthSessionManager({ store });
+  const defaultPublicBase =
+    config.publicBaseUrl ||
+    (config.host === "0.0.0.0" || config.host === "::"
+      ? `http://127.0.0.1:${config.port}`
+      : `http://${config.host}:${config.port}`);
+  const oauthSessions = new OAuthSessionManager({
+    store,
+    publicBaseUrl: defaultPublicBase,
+  });
   const server = createGatewayServer(config, store, router, { oauthSessions });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -73,6 +84,7 @@ export async function bootstrap(customConfig?: Partial<GatewayConfig>) {
       console.log(`Unified MCP Gateway running at http://${config.host}:${config.port}`);
       console.log(`- MCP SSE Endpoint: http://${config.host}:${config.port}/sse`);
       console.log(`- Web Dashboard:    http://${config.host}:${config.port}/`);
+      console.log(`- OAuth callback:   ${defaultPublicBase}/oauth/google/callback`);
       console.log(`- Auth Directory:   ${config.authDir}`);
       if (config.authEncryptionKey) {
         console.log("- Auth encryption:  AES-256-GCM enabled");

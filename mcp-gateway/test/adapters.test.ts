@@ -137,7 +137,7 @@ describe("Service Adapters", () => {
 
       await expect(
         sendTool.execute({ to: "a@b.com", subject: "S", body: "B" }, credWithToken),
-      ).rejects.toMatchObject({ code: "auth_required", details: { provider: "google", alias: "work" } });
+      ).rejects.toMatchObject({ code: "upstream_error", details: { provider: "google", alias: "work" } });
     });
 
     it("searches emails via gmail_search", async () => {

@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { escapeHtml } from "../server/web-panel.ts";
+import { timingSafeEqualString } from "./google-oauth.ts";
 
 export interface CallbackServer {
   port: number;
@@ -7,7 +8,21 @@ export interface CallbackServer {
   close: () => Promise<void>;
 }
 
-export function createLocalOAuthCallbackServer(preferredPort = 0): Promise<CallbackServer> {
+export interface CreateLocalOAuthCallbackServerOptions {
+  preferredPort?: number;
+  expectedState?: string;
+}
+
+export function createLocalOAuthCallbackServer(
+  preferredPortOrOptions: number | CreateLocalOAuthCallbackServerOptions = 0,
+): Promise<CallbackServer> {
+  const options: CreateLocalOAuthCallbackServerOptions =
+    typeof preferredPortOrOptions === "number"
+      ? { preferredPort: preferredPortOrOptions }
+      : preferredPortOrOptions;
+  const preferredPort = options.preferredPort ?? 0;
+  const expectedState = options.expectedState;
+
   return new Promise((resolve, reject) => {
     let capturedCodePromiseResolve: (code: string) => void;
     let capturedCodePromiseReject: (err: Error) => void;
@@ -43,6 +58,15 @@ export function createLocalOAuthCallbackServer(preferredPort = 0): Promise<Callb
         }
 
         const code = url.searchParams.get("code");
+        const state = url.searchParams.get("state");
+        if (expectedState) {
+          if (!state || !timingSafeEqualString(state, expectedState)) {
+            res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+            res.end("<h1>Authentication Failed</h1><p>Invalid OAuth state</p>");
+            capturedCodePromiseReject(new Error("Invalid OAuth state"));
+            return;
+          }
+        }
         if (code) {
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           res.end("<h1>Authentication Successful!</h1><p>You can close this window and return to your terminal.</p>");

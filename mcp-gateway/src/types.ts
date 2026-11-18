@@ -28,4 +28,9 @@ export interface GatewayConfig {
   webPanelEnabled: boolean;
   /** When set, AuthStore encrypts credential files with AES-256-GCM. */
   authEncryptionKey?: string;
+  /**
+   * Absolute origin used for Google OAuth redirect_uri on the dashboard path
+   * (e.g. http://127.0.0.1:8318). From PUBLIC_BASE_URL when set.
+   */
+  publicBaseUrl?: string;
 }

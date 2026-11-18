@@ -18,72 +18,102 @@ import 'package:mobile/features/pairing/pairing_model.dart';
 class _RealHttpOverrides extends HttpOverrides {}
 
 void main() {
-  test('E2E Flow: Pair device -> Store credentials -> Stream messages via dual route', () async {
-    FlutterSecureStorage.setMockInitialValues({});
-    final storage = PairingStorage();
-
-    const qrPayload = '{"host":"127.0.0.1","port":8810,"remoteUrl":null,"pairingSecret":"sec","machineName":"Studio"}';
-    final payload = PairingPayload.fromJsonString(qrPayload);
-
-    await storage.saveDeviceToken('tok-123');
-    await storage.saveEndpoints(lanUrl: payload.lanUrl);
-
-    final mockHttp = MockClient((request) async {
-      if (request.url.path == '/healthz') {
-        return http.Response('{"status":"ok"}', 200);
-      }
-      if (request.url.path.contains('/messages')) {
-        return http.Response('data: Chunky response\n\n', 200, headers: {'content-type': 'text/event-stream'});
-      }
-      return http.Response('OK', 200);
-    });
-
-    final sseClient = SseNetworkClient(
-      lanUrl: (await storage.getLanUrl())!,
-      deviceToken: (await storage.getDeviceToken())!,
-      httpClient: mockHttp,
-    );
-
-    final streamOutput = await sseClient.streamMessages('thread-main').first;
-    expect(streamOutput, 'Chunky response');
-  });
-
-  test('E2E Flow: Dual-route failover to remote endpoint when LAN health check fails', () async {
+  test('E2E Flow: Pair redeem stores omb_ token then streams /api/events', () async {
     FlutterSecureStorage.setMockInitialValues({});
     final storage = PairingStorage();
 
     const qrPayload =
-        '{"host":"192.168.1.100","port":8810,"remoteUrl":"https://omb.remote:8810","pairingSecret":"sec-remote","machineName":"Studio"}';
+        '{"host":"127.0.0.1","port":8810,"pairingSecret":"omb_pair_sec","machineName":"Studio"}';
     final payload = PairingPayload.fromJsonString(qrPayload);
 
-    await storage.saveDeviceToken('remote-device-tok');
-    await storage.saveEndpoints(lanUrl: payload.lanUrl, remoteUrl: payload.remoteUrl);
+    final mockHttp = MockClient((request) async {
+      if (request.url.path == '/api/pair') {
+        return http.Response(
+          jsonEncode({
+            'token': 'omb_live_device_token_abcdefghijklmnopqrstuv',
+            'device': {'id': 'd1', 'name': 'Phone'},
+            'serverName': 'Studio',
+            'endpoints': [
+              {'url': payload.lanUrl, 'kind': 'lan', 'priority': 200},
+            ],
+          }),
+          201,
+        );
+      }
+      if (request.url.path == '/api/health') {
+        return http.Response('{"app":"openmausbot"}', 200);
+      }
+      if (request.url.path == '/api/events') {
+        return http.Response(
+          'data: {"kind":"hello","cursor":"a:0"}\n\n'
+          'id: a:1\ndata: {"kind":"message","message":{"text":"Chunky response","role":"bot","kind":"text"}}\n\n',
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        );
+      }
+      return http.Response('OK', 200);
+    });
+
+    final pair = await SseNetworkClient.redeemPair(
+      baseUrl: payload.lanUrl,
+      credential: payload.credential,
+      deviceName: 'Phone',
+      httpClient: mockHttp,
+    );
+    expect(pair.token, startsWith('omb_'));
+    expect(pair.token, isNot(payload.credential));
+
+    await storage.saveDeviceToken(pair.token);
+    await storage.saveEndpoints(endpoints: pair.endpoints);
+
+    final sseClient = SseNetworkClient(
+      endpoints: await storage.getEndpoints(),
+      deviceToken: (await storage.getDeviceToken())!,
+      httpClient: mockHttp,
+    );
+
+    final event = await sseClient.streamEvents().firstWhere((item) => item.kind == 'message');
+    expect(event.data['message']['text'], 'Chunky response');
+  });
+
+  test('E2E Flow: Dual-route prefers LAN then falls back to hosted', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final storage = PairingStorage();
+
+    await storage.saveDeviceToken('omb_remote-device-tok');
+    await storage.saveEndpoints(endpoints: const [
+      CompanionEndpoint(url: 'http://192.168.1.100:8810', kind: 'lan', priority: 200),
+      CompanionEndpoint(url: 'https://c-hosted.openmausbot.com', kind: 'hosted', priority: 0),
+    ]);
 
     final mockHttp = MockClient((request) async {
       if (request.url.host == '192.168.1.100') {
         return http.Response('Connection refused', 503);
       }
-      if (request.url.host == 'omb.remote' && request.url.path == '/healthz') {
-        return http.Response('{"status":"ok"}', 200);
+      if (request.url.host == 'c-hosted.openmausbot.com' && request.url.path == '/api/health') {
+        return http.Response('{"app":"openmausbot"}', 200);
       }
-      if (request.url.host == 'omb.remote' && request.url.path.contains('/messages')) {
-        return http.Response('data: Remote fallback stream\n\n', 200, headers: {'content-type': 'text/event-stream'});
+      if (request.url.host == 'c-hosted.openmausbot.com' && request.url.path == '/api/events') {
+        return http.Response(
+          'data: {"kind":"message","message":{"text":"Remote fallback stream"}}\n\n',
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        );
       }
       return http.Response('Not found', 404);
     });
 
     final sseClient = SseNetworkClient(
-      lanUrl: (await storage.getLanUrl())!,
-      remoteUrl: await storage.getRemoteUrl(),
+      endpoints: await storage.getEndpoints(),
       deviceToken: (await storage.getDeviceToken())!,
       httpClient: mockHttp,
     );
 
     final activeUrl = await sseClient.resolveActiveBaseUrl();
-    expect(activeUrl, 'https://omb.remote:8810');
+    expect(activeUrl, 'https://c-hosted.openmausbot.com');
 
-    final message = await sseClient.streamMessages('thread-remote').first;
-    expect(message, 'Remote fallback stream');
+    final message = await sseClient.streamEvents().first;
+    expect(message.data['message']['text'], 'Remote fallback stream');
   });
 
   testWidgets('E2E Flow: Tool approval interaction triggers haptics and approves action', (WidgetTester tester) async {
@@ -103,6 +133,8 @@ void main() {
     final request = ApprovalRequest(
       id: 'req-appr-42',
       botId: 'chief',
+      threadId: 'thread-1',
+      requestId: 'req-appr-42',
       toolName: 'google__work__gmail_send_mail',
       arguments: {'to': 'partner@acme.com', 'subject': 'Hợp đồng'},
       dangerLevel: 'high',
@@ -134,14 +166,20 @@ void main() {
     expect(hapticCalls.first.arguments, 'HapticFeedbackType.mediumImpact');
   });
 
-  test('E2E Flow: Live fake companion process serves health, pairing, and SSE messages', () async {
+  test('E2E Flow: Live fake companion serves health, pair redeem, events, send, approve', () async {
     HttpOverrides.global = _RealHttpOverrides();
     addTearDown(() => HttpOverrides.global = null);
 
     final process = await Process.start(
       'node',
       ['--experimental-strip-types', 'test/fixtures/fake-companion.ts'],
-      environment: {'PORT': '0'},
+      workingDirectory: Directory.current.path.endsWith('mobile')
+          ? Directory.current.path
+          : '${Directory.current.path}/mobile',
+      environment: {
+        'PORT': '0',
+        'FAKE_TOKEN': 'omb_fixedtokenfixedtokenfixedtokenfixedto',
+      },
     );
 
     final portCompleter = Completer<int>();
@@ -159,18 +197,26 @@ void main() {
       FlutterSecureStorage.setMockInitialValues({});
       final storage = PairingStorage();
 
-      final qrPayload = '{"host":"127.0.0.1","port":$port,"pairingSecret":"test-secret","machineName":"Studio"}';
-      final payload = PairingPayload.fromJsonString(qrPayload);
+      final health = await http.get(Uri.parse('$baseUrl/api/health'));
+      expect(health.statusCode, 200);
+      expect(jsonDecode(health.body)['app'], 'openmausbot');
+
+      final denied = await http.get(Uri.parse('$baseUrl/healthz'));
+      expect(denied.statusCode, 404);
 
       final pairResponse = await http.post(
         Uri.parse('$baseUrl/api/pair'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'pairingSecret': payload.pairingSecret}),
+        body: jsonEncode({
+          'credential': 'omb_pair_testsecret_testsecret_testsecrett',
+          'deviceName': 'Flutter Test',
+        }),
       );
-      expect(pairResponse.statusCode, 200);
+      expect(pairResponse.statusCode, 201);
       final pairBody = jsonDecode(pairResponse.body) as Map<String, dynamic>;
-      final deviceToken = pairBody['deviceToken'] as String;
-      expect(deviceToken, 'mock-device-token-12345');
+      final deviceToken = pairBody['token'] as String;
+      expect(deviceToken, startsWith('omb_'));
+      expect(pairBody.containsKey('deviceToken'), isFalse);
 
       await storage.saveDeviceToken(deviceToken);
       await storage.saveEndpoints(lanUrl: baseUrl);
@@ -180,11 +226,30 @@ void main() {
         deviceToken: (await storage.getDeviceToken())!,
       );
 
-      final messages = await sseClient.streamMessages('main-thread').toList();
-      expect(messages, [
-        'Xin chào! Tôi là OpenMausBot trên mobile.',
-        'Đang chuẩn bị thực hiện task...',
-      ]);
+      final events = await sseClient.streamEvents().toList();
+      expect(events.first.kind, 'hello');
+      expect(events.any((event) => event.kind == 'message'), isTrue);
+
+      final sent = await sseClient.sendBotMessage(botId: 'bot-main', text: 'ping');
+      expect(sent, isTrue);
+
+      final approved = await sseClient.respondApproval(
+        botId: 'bot-main',
+        threadId: 'thread-main',
+        requestId: 'req-1',
+        behavior: 'allow',
+      );
+      expect(approved, isTrue);
+
+      final wrongSend = await http.post(
+        Uri.parse('$baseUrl/api/threads/default/messages'),
+        headers: {
+          'Authorization': 'Bearer $deviceToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'content': 'nope'}),
+      );
+      expect(wrongSend.statusCode, 404);
     } finally {
       process.kill();
       await process.exitCode;

@@ -16,9 +16,9 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
   exit 1
 fi
 
-export PATH="${FLUTTER_BIN:-$PATH}"
+export PATH="${FLUTTER_BIN:+$FLUTTER_BIN:}$PATH"
 if ! command -v flutter >/dev/null 2>&1; then
-  echo "error: flutter not on PATH (set FLUTTER_BIN or install Flutter 3.24.5)." >&2
+  echo "error: flutter not on PATH (set FLUTTER_BIN to the Flutter bin dir, or install Flutter 3.24.5)." >&2
   exit 1
 fi
 

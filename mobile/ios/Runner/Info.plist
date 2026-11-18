@@ -28,10 +28,6 @@
 	<string>Scan the pairing QR code shown in OpenMausBot desktop Settings → Phone &amp; devices.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Find and reach your OpenMausBot computer on the same Wi‑Fi for companion pairing and chat.</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_openmausbot._tcp</string>
-	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
@@ -39,13 +35,6 @@
 		<key>NSExceptionDomains</key>
 		<dict>
 			<key>ts.net</key>
-			<dict>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-			<key>local</key>
 			<dict>
 				<key>NSIncludesSubdomains</key>
 				<true/>

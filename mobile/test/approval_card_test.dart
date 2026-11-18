@@ -23,6 +23,8 @@ void main() {
     final request = ApprovalRequest(
       id: 'appr-1',
       botId: 'chief',
+      threadId: 'thread-1',
+      requestId: 'appr-1',
       toolName: 'google__work__gmail_send_mail',
       arguments: {'to': 'partner@acme.com', 'subject': 'Hợp đồng'},
     );
@@ -69,6 +71,8 @@ void main() {
     final request = ApprovalRequest(
       id: 'appr-2',
       botId: 'chief',
+      threadId: 'thread-1',
+      requestId: 'req-x',
       toolName: 'bash_run_command',
       arguments: {'command': 'rm -rf /tmp/test'},
       dangerLevel: 'high',
@@ -103,6 +107,8 @@ void main() {
     final request = ApprovalRequest(
       id: 'appr-3',
       botId: 'chief',
+      threadId: 'thread-1',
+      requestId: 'req-x',
       toolName: 'system_reboot',
       arguments: {},
     );
@@ -150,6 +156,8 @@ void main() {
     final minimalRequest = ApprovalRequest(
       id: 'req-100',
       botId: 'chief',
+      threadId: 'thread-1',
+      requestId: 'req-x',
       toolName: 'ping',
       arguments: {},
     );

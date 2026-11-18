@@ -44,7 +44,7 @@ void main() {
       expect(find.text('Liệt kê files'), findsOneWidget);
       expect(find.byType(ChatView), findsOneWidget);
       expect(find.text('OpenMausBot'), findsOneWidget);
-      expect(find.text('Online • LAN'), findsOneWidget);
+      expect(find.text('Online'), findsOneWidget);
     });
 
     testWidgets('AvatarPulse reflects isStreaming state', (WidgetTester tester) async {

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Companion LAN and Tailscale MagicDNS are plain HTTP.
+  Hosted companion URLs are HTTPS and do not use cleartext.
+  Literal LAN IPs are not matchable by <domain>, so cleartext is
+  permitted at the base config for those routes.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

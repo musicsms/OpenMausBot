@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../core/theme/grok_theme.dart';
+import '../approvals/approval_card.dart';
+import '../approvals/approval_model.dart';
 import '../bots/avatar_pulse.dart';
 import 'chat_message.dart';
 
@@ -9,12 +11,20 @@ class ChatView extends StatefulWidget {
   final List<ChatMessage> messages;
   final bool isStreaming;
   final ValueChanged<String> onSendMessage;
+  final String connectionLabel;
+  final ApprovalRequest? pendingApproval;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
 
   const ChatView({
     super.key,
     required this.messages,
     required this.isStreaming,
     required this.onSendMessage,
+    this.connectionLabel = 'Online',
+    this.pendingApproval,
+    this.onApprove,
+    this.onReject,
   });
 
   @override
@@ -49,10 +59,11 @@ class _ChatViewState extends State<ChatView> {
   void didUpdateWidget(ChatView oldWidget) {
     super.didUpdateWidget(oldWidget);
     final hasNewMessage = widget.messages.length != oldWidget.messages.length;
+    final approvalChanged = widget.pendingApproval?.id != oldWidget.pendingApproval?.id;
     final isNearBottom = !_scrollController.hasClients ||
         _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 60;
 
-    if (hasNewMessage || (widget.isStreaming && isNearBottom)) {
+    if (hasNewMessage || approvalChanged || (widget.isStreaming && isNearBottom)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _scrollToBottom();
@@ -79,11 +90,14 @@ class _ChatViewState extends State<ChatView> {
           children: [
             AvatarPulse(isThinking: widget.isStreaming, size: 36),
             const SizedBox(width: 12),
-            const Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('OpenMausBot', style: TextStyle(color: Colors.white, fontSize: 16)),
-                Text('Online • LAN', style: TextStyle(color: GrokTheme.approvalGreen, fontSize: 11)),
+                const Text('OpenMausBot', style: TextStyle(color: Colors.white, fontSize: 16)),
+                Text(
+                  widget.connectionLabel,
+                  style: const TextStyle(color: GrokTheme.approvalGreen, fontSize: 11),
+                ),
               ],
             ),
           ],
@@ -95,8 +109,16 @@ class _ChatViewState extends State<ChatView> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: widget.messages.length,
+              itemCount: widget.messages.length + (widget.pendingApproval != null ? 1 : 0),
               itemBuilder: (context, index) {
+                if (widget.pendingApproval != null && index == widget.messages.length) {
+                  return ApprovalCard(
+                    request: widget.pendingApproval!,
+                    onApprove: widget.onApprove ?? () {},
+                    onReject: widget.onReject ?? () {},
+                  );
+                }
+
                 final msg = widget.messages[index];
                 final isUser = msg.role == 'user';
                 return Align(

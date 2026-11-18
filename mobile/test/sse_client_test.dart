@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/core/network/sse_client.dart';
+import 'package:mobile/features/pairing/pairing_model.dart';
 
 class ClosableMockClient extends MockClient {
   bool isClosed = false;
@@ -17,14 +18,16 @@ class ClosableMockClient extends MockClient {
 
 void main() {
   group('SseNetworkClient', () {
-    test('parses SSE data chunks properly', () async {
+    test('parses SSE JSON event frames from /api/events', () async {
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
-        if (request.url.path.contains('/messages')) {
+        if (request.url.path == '/api/events') {
           return http.Response(
-            'data: Hello world\n\ndata: from OpenMausBot\n\n',
+            'data: {"kind":"hello","cursor":"a:0"}\n\n'
+            'id: a:1\ndata: {"kind":"message","message":{"text":"Hello world"}}\n\n'
+            'id: a:2\ndata: {"kind":"message","message":{"text":"from OpenMausBot"}}\n\n',
             200,
             headers: {'content-type': 'text/event-stream'},
           );
@@ -34,29 +37,33 @@ void main() {
 
       final sseClient = SseNetworkClient(
         lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'test-tok',
+        deviceToken: 'omb_testtok',
         httpClient: mockClient,
       );
 
-      final chunks = await sseClient.streamMessages('th-123').toList();
-      expect(chunks, ['Hello world', 'from OpenMausBot']);
+      final events = await sseClient.streamEvents().toList();
+      expect(events.map((event) => event.kind).toList(), ['hello', 'message', 'message']);
+      expect(events[1].id, 'a:1');
+      expect(events[1].data['message']['text'], 'Hello world');
     });
 
     test('sends Authorization, Accept, and optional Last-Event-ID headers in stream', () async {
       String? capturedAuth;
       String? capturedAccept;
       String? capturedLastEventId;
+      String? capturedPath;
 
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
-        if (request.url.path.contains('/messages')) {
+        if (request.url.path == '/api/events') {
+          capturedPath = request.url.path;
           capturedAuth = request.headers['authorization'];
           capturedAccept = request.headers['accept'];
           capturedLastEventId = request.headers['last-event-id'];
           return http.Response(
-            'data: chunk1\n\n',
+            'data: {"kind":"hello"}\n\n',
             200,
             headers: {'content-type': 'text/event-stream'},
           );
@@ -66,24 +73,23 @@ void main() {
 
       final sseClient = SseNetworkClient(
         lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'test-token-xyz',
+        deviceToken: 'omb_test-token-xyz',
         httpClient: mockClient,
       );
 
-      final chunks = await sseClient
-          .streamMessages('th-456', lastEventId: 'evt-99')
-          .toList();
+      final events = await sseClient.streamEvents(lastEventId: 'evt-99').toList();
 
-      expect(chunks, ['chunk1']);
-      expect(capturedAuth, 'Bearer test-token-xyz');
+      expect(events, isNotEmpty);
+      expect(capturedPath, '/api/events');
+      expect(capturedAuth, 'Bearer omb_test-token-xyz');
       expect(capturedAccept, 'text/event-stream');
       expect(capturedLastEventId, 'evt-99');
     });
 
     test('throws Exception when stream endpoint returns non-200 status', () async {
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
         return http.Response('Unauthorized', 401);
       });
@@ -95,43 +101,48 @@ void main() {
       );
 
       expect(
-        () => sseClient.streamMessages('th-err').toList(),
+        () => sseClient.streamEvents().toList(),
         throwsA(isA<Exception>()),
       );
     });
 
-    test('resolveActiveBaseUrl sends Authorization header during health check', () async {
+    test('resolveActiveBaseUrl probes /api/health with Authorization', () async {
       String? capturedAuth;
+      String? capturedPath;
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          capturedAuth = request.headers['authorization'];
-          return http.Response('{"status":"ok"}', 200);
+        capturedAuth = request.headers['authorization'];
+        capturedPath = request.url.path;
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
         return http.Response('Not found', 404);
       });
 
       final sseClient = SseNetworkClient(
         lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'probe-secret-token',
+        deviceToken: 'omb_probe-secret-token',
         httpClient: mockClient,
       );
 
       await sseClient.resolveActiveBaseUrl();
-      expect(capturedAuth, 'Bearer probe-secret-token');
+      expect(capturedPath, '/api/health');
+      expect(capturedAuth, 'Bearer omb_probe-secret-token');
     });
 
     test('resolveActiveBaseUrl prefers LAN when health check succeeds', () async {
       final mockClient = MockClient((request) async {
-        if (request.url.host == '192.168.1.100' && request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
+        if (request.url.host == '192.168.1.100' && request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
         return http.Response('Not found', 404);
       });
 
       final sseClient = SseNetworkClient(
-        lanUrl: 'http://192.168.1.100:8810',
-        remoteUrl: 'https://tailscale.openmausbot.ts.net:8810',
-        deviceToken: 'test-tok',
+        endpoints: const [
+          CompanionEndpoint(url: 'https://c-hosted.openmausbot.com', kind: 'hosted', priority: 0),
+          CompanionEndpoint(url: 'http://192.168.1.100:8810', kind: 'lan', priority: 200),
+        ],
+        deviceToken: 'omb_test-tok',
         httpClient: mockClient,
       );
 
@@ -139,26 +150,31 @@ void main() {
       expect(activeUrl, 'http://192.168.1.100:8810');
     });
 
-    test('resolveActiveBaseUrl falls back to remoteUrl when LAN health check fails', () async {
+    test('resolveActiveBaseUrl falls back to hosted when LAN health check fails', () async {
       final mockClient = MockClient((request) async {
         if (request.url.host == '192.168.1.100') {
           return http.Response('Error', 500);
         }
-        return http.Response('{"status":"ok"}', 200);
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
+        }
+        return http.Response('Not found', 404);
       });
 
       final sseClient = SseNetworkClient(
-        lanUrl: 'http://192.168.1.100:8810',
-        remoteUrl: 'https://tailscale.openmausbot.ts.net:8810',
-        deviceToken: 'test-tok',
+        endpoints: const [
+          CompanionEndpoint(url: 'http://192.168.1.100:8810', kind: 'lan', priority: 200),
+          CompanionEndpoint(url: 'https://c-hosted.openmausbot.com', kind: 'hosted', priority: 0),
+        ],
+        deviceToken: 'omb_test-tok',
         httpClient: mockClient,
       );
 
       final activeUrl = await sseClient.resolveActiveBaseUrl();
-      expect(activeUrl, 'https://tailscale.openmausbot.ts.net:8810');
+      expect(activeUrl, 'https://c-hosted.openmausbot.com');
     });
 
-    test('resolveActiveBaseUrl returns lanUrl if LAN fails and remoteUrl is not configured', () async {
+    test('resolveActiveBaseUrl returns first endpoint if none are healthy', () async {
       final mockClient = MockClient((request) async {
         throw http.ClientException('Connection refused');
       });
@@ -166,7 +182,7 @@ void main() {
       final sseClient = SseNetworkClient(
         lanUrl: 'http://192.168.1.100:8810',
         remoteUrl: null,
-        deviceToken: 'test-tok',
+        deviceToken: 'omb_test-tok',
         httpClient: mockClient,
       );
 
@@ -174,10 +190,10 @@ void main() {
       expect(activeUrl, 'http://192.168.1.100:8810');
     });
 
-    test('strips trailing slashes from lanUrl and remoteUrl', () async {
+    test('strips trailing slashes from endpoint URLs', () async {
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
         return http.Response('Not found', 404);
       });
@@ -185,7 +201,7 @@ void main() {
       final sseClient = SseNetworkClient(
         lanUrl: 'http://127.0.0.1:8810///',
         remoteUrl: 'https://remote.example.com///',
-        deviceToken: 'test-tok',
+        deviceToken: 'omb_test-tok',
         httpClient: mockClient,
       );
 
@@ -195,55 +211,90 @@ void main() {
       expect(activeUrl, 'http://127.0.0.1:8810');
     });
 
-    test('postJson attaches headers, serializes body, and returns true on success', () async {
+    test('sendBotMessage posts to /api/bots/:id/messages with text', () async {
       String? capturedAuth;
-      String? capturedContentType;
       String? capturedBody;
       String? capturedPath;
 
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
         if (request.method == 'POST') {
           capturedAuth = request.headers['authorization'];
-          capturedContentType = request.headers['content-type'];
           capturedBody = request.body;
           capturedPath = request.url.path;
-          return http.Response('{"success":true}', 200);
+          return http.Response('{"ok":true}', 202);
         }
         return http.Response('Not found', 404);
       });
 
       final sseClient = SseNetworkClient(
         lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'test-tok-post',
+        deviceToken: 'omb_test-tok-post',
         httpClient: mockClient,
       );
 
-      final success = await sseClient.postJson(
-        '/api/threads/th-1/messages',
-        {'content': 'test message'},
+      final success = await sseClient.sendBotMessage(
+        botId: 'bot-main',
+        text: 'test message',
       );
 
       expect(success, isTrue);
-      expect(capturedPath, '/api/threads/th-1/messages');
-      expect(capturedAuth, 'Bearer test-tok-post');
-      expect(capturedContentType, 'application/json');
-      expect(jsonDecode(capturedBody!), {'content': 'test message'});
+      expect(capturedPath, '/api/bots/bot-main/messages');
+      expect(capturedAuth, 'Bearer omb_test-tok-post');
+      expect(jsonDecode(capturedBody!), {'text': 'test message'});
+    });
+
+    test('respondApproval posts behavior to /api/bots/:id/respond', () async {
+      String? capturedPath;
+      String? capturedBody;
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
+        }
+        if (request.method == 'POST') {
+          capturedPath = request.url.path;
+          capturedBody = request.body;
+          return http.Response('{"ok":true}', 200);
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final sseClient = SseNetworkClient(
+        lanUrl: 'http://127.0.0.1:8810',
+        deviceToken: 'omb_test-tok',
+        httpClient: mockClient,
+      );
+
+      final success = await sseClient.respondApproval(
+        botId: 'bot-main',
+        threadId: 'thread-1',
+        requestId: 'req-9',
+        behavior: 'allow',
+      );
+
+      expect(success, isTrue);
+      expect(capturedPath, '/api/bots/bot-main/respond');
+      expect(jsonDecode(capturedBody!), {
+        'threadId': 'thread-1',
+        'requestId': 'req-9',
+        'behavior': 'allow',
+      });
     });
 
     test('postJson returns false on non-2xx status code', () async {
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
+        if (request.url.path == '/api/health') {
+          return http.Response('{"app":"openmausbot"}', 200);
         }
         return http.Response('Bad request', 400);
       });
 
       final sseClient = SseNetworkClient(
         lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'test-tok',
+        deviceToken: 'omb_test-tok',
         httpClient: mockClient,
       );
 
@@ -251,57 +302,43 @@ void main() {
       expect(success, isFalse);
     });
 
-    test('postJson returns false on network or transport exception', () async {
+    test('redeemPair stores companion token from 201 response', () async {
       final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
-        }
-        throw http.ClientException('Network down');
+        expect(request.url.path, '/api/pair');
+        expect(request.method, 'POST');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['credential'], 'omb_pair_abc');
+        expect(body['deviceName'], 'Phone');
+        return http.Response(
+          jsonEncode({
+            'token': 'omb_device_token_value_123456789012345678901',
+            'device': {'id': 'd1', 'name': 'Phone'},
+            'serverName': 'Studio',
+            'endpoints': [
+              {'url': 'http://192.168.1.8:8810', 'kind': 'lan', 'priority': 200},
+            ],
+          }),
+          201,
+        );
       });
 
-      final sseClient = SseNetworkClient(
-        lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'test-tok',
+      final result = await SseNetworkClient.redeemPair(
+        baseUrl: 'http://192.168.1.8:8810',
+        credential: 'omb_pair_abc',
+        deviceName: 'Phone',
         httpClient: mockClient,
       );
 
-      final success = await sseClient.postJson('/api/broken', {'data': 1});
-      expect(success, isFalse);
-    });
-
-    test('connectStream and resolveActiveEndpoint aliases function correctly', () async {
-      final mockClient = MockClient((request) async {
-        if (request.url.path == '/healthz') {
-          return http.Response('{"status":"ok"}', 200);
-        }
-        if (request.url.path.contains('/messages')) {
-          return http.Response(
-            'data: alias-msg\n\n',
-            200,
-            headers: {'content-type': 'text/event-stream'},
-          );
-        }
-        return http.Response('Not found', 404);
-      });
-
-      final sseClient = SseNetworkClient(
-        lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'test-tok',
-        httpClient: mockClient,
-      );
-
-      final endpoint = await sseClient.resolveActiveEndpoint();
-      expect(endpoint, 'http://127.0.0.1:8810');
-
-      final chunks = await sseClient.connectStream('th-alias').toList();
-      expect(chunks, ['alias-msg']);
+      expect(result.token, startsWith('omb_'));
+      expect(result.serverName, 'Studio');
+      expect(result.endpoints.single.kind, 'lan');
     });
 
     test('close closes the underlying http client', () {
       final mockClient = ClosableMockClient((request) async => http.Response('ok', 200));
       final sseClient = SseNetworkClient(
         lanUrl: 'http://127.0.0.1:8810',
-        deviceToken: 'test-tok',
+        deviceToken: 'omb_test-tok',
         httpClient: mockClient,
       );
 

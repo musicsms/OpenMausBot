@@ -35,13 +35,25 @@ export async function runCli(
   const command = args[0];
 
   if (command === "list") {
-    const accounts = await store.listAccounts();
+    const entries = await store.listAccountEntries();
     table(
-      accounts.map((a) => ({
-        Provider: a.provider,
-        Alias: a.alias,
-        Updated: new Date(a.updatedAt).toLocaleString(),
-      })),
+      entries.map((entry) => {
+        if (entry.kind === "account") {
+          const a = entry.account;
+          return {
+            Provider: a.provider,
+            Alias: a.alias,
+            Updated: new Date(a.updatedAt).toLocaleString(),
+            Status: "ok",
+          };
+        }
+        return {
+          Provider: entry.entry.provider || "?",
+          Alias: entry.entry.alias || entry.entry.file,
+          Updated: "",
+          Status: `unreadable:${entry.entry.reason}`,
+        };
+      }),
     );
     return 0;
   }

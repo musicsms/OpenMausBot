@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { GatewayToolError } from "../src/errors.ts";
+import { GatewayToolError, throwForUpstreamStatus } from "../src/errors.ts";
 import { fetchWith429Retry, readRetryAfterSeconds } from "../src/http-retry.ts";
 import { parseToolArgs, gmailSendSchema } from "../src/tool-args.ts";
 import { GoogleAdapter } from "../src/adapters/google-adapter.ts";
@@ -73,5 +73,31 @@ describe("Error contract helpers", () => {
   it("reads Retry-After seconds from responses", () => {
     const res = new Response("", { status: 429, headers: { "Retry-After": "7" } });
     expect(readRetryAfterSeconds(res)).toBe(7);
+  });
+
+  it("maps 401 to auth_required, permission 403 to upstream_error, rate-limit 403 to rate_limited", () => {
+    try {
+      throwForUpstreamStatus("google", "work", 401, "Unauthorized", "Gmail");
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toMatchObject({ code: "auth_required" });
+    }
+
+    try {
+      throwForUpstreamStatus("google", "work", 403, "Insufficient permission", "Gmail");
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toMatchObject({ code: "upstream_error" });
+    }
+
+    try {
+      throwForUpstreamStatus("google", "work", 403, "User rateLimitExceeded", "Gmail", 12);
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toMatchObject({
+        code: "rate_limited",
+        details: { provider: "google", alias: "work", retryAfter: 12 },
+      });
+    }
   });
 });

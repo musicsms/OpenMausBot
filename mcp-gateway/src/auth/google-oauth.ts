@@ -1,3 +1,4 @@
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { OAuthTokenRecord } from "../types.ts";
 
 export const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -18,6 +19,11 @@ export interface GoogleOAuthClientConfig {
   clientSecret: string;
 }
 
+export interface PkcePair {
+  verifier: string;
+  challenge: string;
+}
+
 export function resolveGoogleOAuthClient(
   env: Record<string, string | undefined> = process.env,
 ): GoogleOAuthClientConfig | null {
@@ -27,10 +33,30 @@ export function resolveGoogleOAuthClient(
   return { clientId, clientSecret };
 }
 
+export function createPkcePair(): PkcePair {
+  const verifier = randomBytes(32).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  return { verifier, challenge };
+}
+
+export function createOAuthState(): string {
+  return randomBytes(24).toString("base64url");
+}
+
+export function timingSafeEqualString(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  if (left.length !== right.length) {
+    return false;
+  }
+  return timingSafeEqual(left, right);
+}
+
 export function buildGoogleAuthorizeUrl(options: {
   clientId: string;
   redirectUri: string;
-  state?: string;
+  state: string;
+  codeChallenge: string;
   scopes?: readonly string[];
 }): string {
   const params = new URLSearchParams({
@@ -40,10 +66,10 @@ export function buildGoogleAuthorizeUrl(options: {
     access_type: "offline",
     prompt: "consent",
     scope: (options.scopes ?? GOOGLE_DEFAULT_SCOPES).join(" "),
+    state: options.state,
+    code_challenge: options.codeChallenge,
+    code_challenge_method: "S256",
   });
-  if (options.state) {
-    params.set("state", options.state);
-  }
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
@@ -68,6 +94,7 @@ export async function exchangeGoogleAuthCode(
     clientSecret: string;
     code: string;
     redirectUri: string;
+    codeVerifier: string;
     fetchImpl?: typeof fetch;
   },
 ): Promise<OAuthTokenRecord> {
@@ -81,6 +108,7 @@ export async function exchangeGoogleAuthCode(
       client_secret: options.clientSecret,
       redirect_uri: options.redirectUri,
       grant_type: "authorization_code",
+      code_verifier: options.codeVerifier,
     }),
   });
   const payload = (await res.json()) as Record<string, unknown>;

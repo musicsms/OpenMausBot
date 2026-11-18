@@ -50,6 +50,19 @@ export function requireAccountToken(
   return token;
 }
 
+function looksLikeRateLimit(body: string, retryAfter?: number): boolean {
+  if (retryAfter !== undefined) return true;
+  const lower = body.toLowerCase();
+  return (
+    lower.includes("rate limit") ||
+    lower.includes("ratelimit") ||
+    lower.includes("quota") ||
+    lower.includes("too many requests") ||
+    lower.includes("userRateLimitExceeded".toLowerCase()) ||
+    lower.includes("rateLimitExceeded".toLowerCase())
+  );
+}
+
 export function throwForUpstreamStatus(
   provider: string,
   alias: string,
@@ -58,10 +71,24 @@ export function throwForUpstreamStatus(
   serviceLabel: string,
   retryAfter?: number,
 ): never {
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     throw new GatewayToolError(
       `Token for '${provider}:${alias}' was rejected by ${serviceLabel} (${status}). Re-authenticate via CLI or the gateway dashboard.`,
       "auth_required",
+      { provider, alias },
+    );
+  }
+  if (status === 403 && looksLikeRateLimit(body, retryAfter)) {
+    throw new GatewayToolError(
+      `${serviceLabel} rate limit exceeded (${status}).`,
+      "rate_limited",
+      { provider, alias, retryAfter },
+    );
+  }
+  if (status === 403) {
+    throw new GatewayToolError(
+      `${serviceLabel} denied access (${status}): ${body}`,
+      "upstream_error",
       { provider, alias },
     );
   }

@@ -3,13 +3,14 @@ import type { AuthStore } from "../storage/auth-store.ts";
 import type { AccountCredential, OAuthTokenRecord, ProviderType } from "../types.ts";
 import { KNOWN_PROVIDERS } from "../types.ts";
 import { renderDashboardHtml } from "./web-panel.ts";
-import { toPublicAccount } from "./account-public.ts";
+import { toPublicAccount, toPublicAccountEntry } from "./account-public.ts";
 import { requireBearerAuth } from "./auth.ts";
 import type { OAuthSessionManager } from "../auth/oauth-sessions.ts";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const ACCOUNT_ITEM_ROUTE = /^\/api\/accounts\/([^/]+)\/([^/]+)\/?$/;
 const OAUTH_STATUS_ROUTE = /^\/api\/oauth\/google\/status\/([^/]+)\/?$/;
+const OAUTH_CALLBACK_PATH = "/oauth/google/callback";
 
 export interface AdminRouteOptions {
   webPanelEnabled?: boolean;
@@ -17,6 +18,8 @@ export interface AdminRouteOptions {
   /** When true, caller already enforced bearer auth (unified gateway server). */
   skipAuth?: boolean;
   oauthSessions?: OAuthSessionManager;
+  /** Absolute origin for Google redirect_uri (PUBLIC_BASE_URL). */
+  publicBaseUrl?: string;
 }
 
 class PayloadTooLargeError extends Error {
@@ -83,10 +86,33 @@ export async function handleAdminRequest(
     pathname === "/" ||
     pathname === "/api/accounts" ||
     pathname === "/api/oauth/google/start" ||
+    pathname === OAUTH_CALLBACK_PATH ||
     ACCOUNT_ITEM_ROUTE.test(pathname) ||
     OAUTH_STATUS_ROUTE.test(pathname);
   if (!isAdminPath) {
     return false;
+  }
+
+  // Browser redirect from Google; must not require the gateway bearer.
+  if (pathname === OAUTH_CALLBACK_PATH) {
+    if (method !== "GET") {
+      res.writeHead(405, { "Content-Type": "application/json", Allow: "GET" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return true;
+    }
+    if (!options.oauthSessions) {
+      sendJson(res, 503, { error: "OAuth session manager is not available" });
+      return true;
+    }
+    const result = await options.oauthSessions.handleGoogleCallback({
+      state: url.searchParams.get("state"),
+      code: url.searchParams.get("code"),
+      error: url.searchParams.get("error"),
+      errorDescription: url.searchParams.get("error_description"),
+    });
+    res.writeHead(result.statusCode, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(result.html);
+    return true;
   }
 
   if (!options.skipAuth && !requireBearerAuth(req, res, options.internalKey)) {
@@ -137,7 +163,9 @@ export async function handleAdminRequest(
     }
     const alias = typeof body.alias === "string" && body.alias.trim() ? body.alias.trim() : "default";
     try {
-      const session = await options.oauthSessions.startGoogle(alias);
+      const requestBase = req.headers.host ? `http://${req.headers.host}` : undefined;
+      const publicBaseUrl = options.publicBaseUrl || requestBase;
+      const session = await options.oauthSessions.startGoogle(alias, { publicBaseUrl });
       sendJson(res, 201, {
         success: true,
         sessionId: session.id,
@@ -181,8 +209,8 @@ export async function handleAdminRequest(
   if (pathname === "/api/accounts") {
     if (method === "GET") {
       try {
-        const accounts = await store.listAccounts();
-        sendJson(res, 200, accounts.map(toPublicAccount));
+        const entries = await store.listAccountEntries();
+        sendJson(res, 200, entries.map(toPublicAccountEntry));
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : "Internal server error" });
       }

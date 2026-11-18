@@ -2,6 +2,8 @@ import type { AuthStore } from "../storage/auth-store.ts";
 import { createLocalOAuthCallbackServer } from "./oauth-helpers.ts";
 import {
   buildGoogleAuthorizeUrl,
+  createOAuthState,
+  createPkcePair,
   exchangeGoogleAuthCode,
   resolveGoogleOAuthClient,
   type GoogleOAuthClientConfig,
@@ -32,11 +34,18 @@ export async function runGoogleOAuthConsent(deps: GoogleConsentDeps): Promise<Go
     );
   }
 
-  const callback = await createLocalOAuthCallbackServer(deps.preferredCallbackPort ?? 0);
+  const state = createOAuthState();
+  const pkce = createPkcePair();
+  const callback = await createLocalOAuthCallbackServer({
+    preferredPort: deps.preferredCallbackPort ?? 0,
+    expectedState: state,
+  });
   const redirectUri = `http://127.0.0.1:${callback.port}/callback`;
   const authorizeUrl = buildGoogleAuthorizeUrl({
     clientId: client.clientId,
     redirectUri,
+    state,
+    codeChallenge: pkce.challenge,
   });
 
   const log = deps.log ?? console.log;
@@ -53,6 +62,7 @@ export async function runGoogleOAuthConsent(deps: GoogleConsentDeps): Promise<Go
       clientSecret: client.clientSecret,
       code,
       redirectUri,
+      codeVerifier: pkce.verifier,
       fetchImpl: deps.fetchImpl,
     });
 

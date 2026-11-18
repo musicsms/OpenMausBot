@@ -18,6 +18,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const allowNonLoopback = env.GATEWAY_ALLOW_NON_LOOPBACK === "1";
   const authEncryptionKey = (env.AUTH_ENCRYPTION_KEY || "").trim() || undefined;
   const encryptionRequired = env.AUTH_ENCRYPTION_REQUIRED === "1";
+  const publicBaseUrl = (env.PUBLIC_BASE_URL || "").trim().replace(/\/$/, "") || undefined;
 
   if (!internalKey) {
     throw new Error(
@@ -37,5 +38,5 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     );
   }
 
-  return { host, port, authDir, internalKey, webPanelEnabled, authEncryptionKey };
+  return { host, port, authDir, internalKey, webPanelEnabled, authEncryptionKey, publicBaseUrl };
 }

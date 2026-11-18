@@ -59,6 +59,14 @@ describe("Gateway Config", () => {
     expect(config.authEncryptionKey).toBe("enc-secret");
   });
 
+  it("loads PUBLIC_BASE_URL when present", () => {
+    const config = loadConfig({
+      GATEWAY_INTERNAL_KEY: "stable-test-key",
+      PUBLIC_BASE_URL: "http://127.0.0.1:8318/",
+    });
+    expect(config.publicBaseUrl).toBe("http://127.0.0.1:8318");
+  });
+
   it("refuses start when AUTH_ENCRYPTION_REQUIRED=1 without a key", () => {
     expect(() =>
       loadConfig({

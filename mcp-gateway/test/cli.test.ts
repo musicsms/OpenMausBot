@@ -38,6 +38,24 @@ describe("OAuth Callback Helper", () => {
     await server.close();
   });
 
+  it("escapes error_description in OAuth callback HTML", async () => {
+    const server = await createLocalOAuthCallbackServer(0);
+    const testPromise = server.waitForCode();
+
+    const payload = '<img src=x onerror=alert(1)>';
+    const res = await fetch(
+      `http://127.0.0.1:${server.port}/callback?error=access_denied&error_description=${encodeURIComponent(payload)}`,
+    );
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("Authentication Failed");
+    expect(text).not.toContain(payload);
+    expect(text).toContain("&lt;img src=x onerror=alert(1)&gt;");
+
+    await expect(testPromise).rejects.toThrow(payload);
+    await server.close();
+  });
+
   it("rejects waitForCode if server is closed before authorization", async () => {
     const server = await createLocalOAuthCallbackServer(0);
     const testPromise = server.waitForCode();
@@ -185,8 +203,9 @@ describe("CLI Runner", () => {
     expect(saved?.apiKey).toBe("ghp_my_token");
   });
 
-  it("directs user to web UI when no pat is provided for auth", async () => {
-    const logs: string[] = [];
+  it("rejects OAuth-less auth and points at PAT usage for the MVP", async () => {
+    const errors: string[] = [];
+    let exitCode: number | undefined;
     const code = await runCli(["auth", "google", "--alias", "work"], {
       config: {
         host: "127.0.0.1",
@@ -196,11 +215,16 @@ describe("CLI Runner", () => {
         webPanelEnabled: true,
       },
       store,
-      io: { log: (msg) => logs.push(String(msg)) },
+      io: {
+        error: (msg) => errors.push(String(msg)),
+        exit: (c) => { exitCode = c; },
+      },
     });
 
-    expect(code).toBe(0);
-    expect(logs.some((l) => l.includes("Please use Web UI on http://127.0.0.1:8318"))).toBe(true);
+    expect(code).toBe(1);
+    expect(exitCode).toBe(1);
+    expect(errors.some((l) => l.includes("OAuth consent is not available in this PAT MVP build"))).toBe(true);
+    expect(errors.some((l) => l.includes("--pat <token>"))).toBe(true);
   });
 
   it("executes src/cli.ts directly via node CLI runner", async () => {
@@ -212,6 +236,7 @@ describe("CLI Runner", () => {
         env: {
           ...process.env,
           AUTH_DIR: tempDir,
+          GATEWAY_INTERNAL_KEY: "cli-exec-test-key",
         },
       },
     );

@@ -6,6 +6,7 @@ import type { GatewayConfig } from "../types.ts";
 import type { AuthStore } from "../storage/auth-store.ts";
 import type { McpRouter } from "./router.ts";
 import { handleAdminRequest } from "../server/admin-routes.ts";
+import { requireBearerAuth } from "../server/auth.ts";
 
 function createMcpServer(store: AuthStore, router: McpRouter): Server {
   const mcpServer = new Server(
@@ -46,7 +47,6 @@ export function createGatewayServer(
   router: McpRouter,
 ): HttpServer {
   const transports = new Map<string, SSEServerTransport>();
-  let activeTransport: SSEServerTransport | null = null;
 
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const host = req.headers.host || `${config.host}:${config.port}`;
@@ -55,6 +55,10 @@ export function createGatewayServer(
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+
+    if (!requireBearerAuth(req, res, config.internalKey)) {
       return;
     }
 
@@ -68,13 +72,9 @@ export function createGatewayServer(
       const transport = new SSEServerTransport("/message", res);
       const sessionId = transport.sessionId;
       transports.set(sessionId, transport);
-      activeTransport = transport;
 
       transport.onclose = () => {
         transports.delete(sessionId);
-        if (activeTransport === transport) {
-          activeTransport = null;
-        }
       };
 
       await mcpServer.connect(transport);
@@ -88,7 +88,12 @@ export function createGatewayServer(
         return;
       }
       const sessionId = url.searchParams.get("sessionId");
-      const transport = sessionId ? transports.get(sessionId) : activeTransport;
+      if (!sessionId) {
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end("Missing sessionId");
+        return;
+      }
+      const transport = transports.get(sessionId);
       if (transport) {
         await transport.handlePostMessage(req, res);
       } else {
@@ -100,6 +105,8 @@ export function createGatewayServer(
     try {
       const handled = await handleAdminRequest(req, res, store, {
         webPanelEnabled: config.webPanelEnabled,
+        internalKey: config.internalKey,
+        skipAuth: true,
       });
       if (handled) {
         return;
@@ -120,7 +127,6 @@ export function createGatewayServer(
       transport.close().catch(() => {});
     }
     transports.clear();
-    activeTransport = null;
   });
 
   return httpServer;

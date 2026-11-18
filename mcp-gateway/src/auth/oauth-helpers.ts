@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { escapeHtml } from "../server/web-panel.ts";
 
 export interface CallbackServer {
   port: number;
@@ -36,7 +37,7 @@ export function createLocalOAuthCallbackServer(preferredPort = 0): Promise<Callb
         if (error) {
           const errorDesc = url.searchParams.get("error_description") || error;
           res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
-          res.end(`<h1>Authentication Failed</h1><p>${errorDesc}</p>`);
+          res.end(`<h1>Authentication Failed</h1><p>${escapeHtml(errorDesc)}</p>`);
           capturedCodePromiseReject(new Error(errorDesc));
           return;
         }

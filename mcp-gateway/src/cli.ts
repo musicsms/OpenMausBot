@@ -85,8 +85,13 @@ export async function runCli(
       return 0;
     }
 
-    log(`Please use Web UI on http://127.0.0.1:${config.port} for OAuth2 authorization.`);
-    return 0;
+    error(
+      `OAuth consent is not available in this PAT MVP build. Use: mcp-gateway auth ${provider} --alias ${alias} --pat <token>`,
+    );
+    if (exit) {
+      exit(1);
+    }
+    return 1;
   }
 
   log("Commands: list, auth <provider> --alias <name>");

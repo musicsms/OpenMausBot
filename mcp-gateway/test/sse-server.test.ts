@@ -12,6 +12,7 @@ import { createGatewayServer } from "../src/mcp/sse-server.ts";
 import { AuthStore } from "../src/storage/auth-store.ts";
 import { bootstrap } from "../src/index.ts";
 import type { GatewayConfig, ProviderType } from "../src/types.ts";
+import { TEST_INTERNAL_KEY, authHeaders, sseAuthOptions } from "./test-auth.ts";
 
 describe("MCP Router", () => {
   it("aggregates tools across multiple accounts dynamically", () => {
@@ -168,7 +169,7 @@ describe("Gateway HTTP Server & Endpoints", () => {
       host: "127.0.0.1",
       port: 0,
       authDir: tempDir,
-      internalKey: "test-secret-key",
+      internalKey: TEST_INTERNAL_KEY,
       webPanelEnabled: true,
     };
 
@@ -211,7 +212,7 @@ describe("Gateway HTTP Server & Endpoints", () => {
       updatedAt: 200,
     });
 
-    const res = await fetch(`${baseUrl}/`);
+    const res = await fetch(`${baseUrl}/`, { headers: authHeaders() });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
     const html = await res.text();
@@ -224,7 +225,7 @@ describe("Gateway HTTP Server & Endpoints", () => {
       host: "127.0.0.1",
       port: 0,
       authDir: tempDir,
-      internalKey: "test-secret-key",
+      internalKey: TEST_INTERNAL_KEY,
       webPanelEnabled: false,
     };
     const disabledServer = createGatewayServer(disabledConfig, store, new McpRouter({}));
@@ -235,7 +236,7 @@ describe("Gateway HTTP Server & Endpoints", () => {
     if (!addr || typeof addr === "string") throw new Error("No address");
 
     try {
-      const res = await fetch(`http://127.0.0.1:${addr.port}/`);
+      const res = await fetch(`http://127.0.0.1:${addr.port}/`, { headers: authHeaders() });
       expect(res.status).toBe(404);
     } finally {
       await new Promise<void>((resolve) => {
@@ -252,7 +253,7 @@ describe("Gateway HTTP Server & Endpoints", () => {
       updatedAt: 20,
     });
 
-    const res = await fetch(`${baseUrl}/api/accounts`);
+    const res = await fetch(`${baseUrl}/api/accounts`, { headers: authHeaders() });
     expect(res.status).toBe(200);
     const accounts = await res.json();
     expect(accounts).toHaveLength(1);
@@ -260,30 +261,39 @@ describe("Gateway HTTP Server & Endpoints", () => {
   });
 
   it("returns 404 for unhandled paths", async () => {
-    const res = await fetch(`${baseUrl}/unknown-route`);
+    const res = await fetch(`${baseUrl}/unknown-route`, { headers: authHeaders() });
     expect(res.status).toBe(404);
   });
 
   it("returns 405 Method Not Allowed for non-GET on /sse", async () => {
-    const res = await fetch(`${baseUrl}/sse`, { method: "POST" });
+    const res = await fetch(`${baseUrl}/sse`, { method: "POST", headers: authHeaders() });
     expect(res.status).toBe(405);
   });
 
   it("returns 405 Method Not Allowed for non-POST on /message", async () => {
-    const res = await fetch(`${baseUrl}/message`, { method: "GET" });
+    const res = await fetch(`${baseUrl}/message`, { method: "GET", headers: authHeaders() });
     expect(res.status).toBe(405);
   });
 
   it("returns 400 on POST /message when no active SSE transport is connected", async () => {
     const res = await fetch(`${baseUrl}/message`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 1 }),
     });
 
     expect(res.status).toBe(400);
     const text = await res.text();
-    expect(text).toContain("No active SSE transport connection");
+    expect(text).toContain("Missing sessionId");
+  });
+
+  it("rejects unauthenticated MCP and admin requests with 401", async () => {
+    const sse = await fetch(`${baseUrl}/sse`);
+    expect(sse.status).toBe(401);
+    const admin = await fetch(`${baseUrl}/api/accounts`);
+    expect(admin.status).toBe(401);
+    const health = await fetch(`${baseUrl}/healthz`);
+    expect(health.status).toBe(200);
   });
 });
 
@@ -339,7 +349,7 @@ describe("MCP Protocol over SSE Integration", () => {
       host: "127.0.0.1",
       port: 0,
       authDir: tempDir,
-      internalKey: "test-key",
+      internalKey: TEST_INTERNAL_KEY,
       webPanelEnabled: true,
     };
 
@@ -363,7 +373,7 @@ describe("MCP Protocol over SSE Integration", () => {
 
   it("connects MCP client, lists tools, executes tools, and detects dynamic account additions", async () => {
     const sseUrl = new URL(`http://127.0.0.1:${serverPort}/sse`);
-    const transport = new SSEClientTransport(sseUrl);
+    const transport = new SSEClientTransport(sseUrl, sseAuthOptions());
     const client = new Client(
       { name: "test-client", version: "1.0.0" },
       { capabilities: {} },
@@ -415,7 +425,7 @@ describe("MCP Protocol over SSE Integration", () => {
 
   it("propagates tool execution errors to the MCP client", async () => {
     const sseUrl = new URL(`http://127.0.0.1:${serverPort}/sse`);
-    const transport = new SSEClientTransport(sseUrl);
+    const transport = new SSEClientTransport(sseUrl, sseAuthOptions());
     const client = new Client(
       { name: "test-error-client", version: "1.0.0" },
       { capabilities: {} },
@@ -434,11 +444,11 @@ describe("MCP Protocol over SSE Integration", () => {
   });
 
   it("handles multiple client connections simultaneously", async () => {
-    const transport1 = new SSEClientTransport(new URL(`http://127.0.0.1:${serverPort}/sse`));
+    const transport1 = new SSEClientTransport(new URL(`http://127.0.0.1:${serverPort}/sse`), sseAuthOptions());
     const client1 = new Client({ name: "client-1", version: "1.0.0" }, { capabilities: {} });
     await client1.connect(transport1);
 
-    const transport2 = new SSEClientTransport(new URL(`http://127.0.0.1:${serverPort}/sse`));
+    const transport2 = new SSEClientTransport(new URL(`http://127.0.0.1:${serverPort}/sse`), sseAuthOptions());
     const client2 = new Client({ name: "client-2", version: "1.0.0" }, { capabilities: {} });
     await client2.connect(transport2);
 
@@ -460,13 +470,13 @@ describe("MCP Protocol over SSE Integration", () => {
 
   it("returns 400 when POST /message is called with unknown sessionId even when active transport exists", async () => {
     const sseUrl = new URL(`http://127.0.0.1:${serverPort}/sse`);
-    const transport = new SSEClientTransport(sseUrl);
+    const transport = new SSEClientTransport(sseUrl, sseAuthOptions());
     const client = new Client({ name: "active-client", version: "1.0.0" }, { capabilities: {} });
     await client.connect(transport);
 
     const res = await fetch(`http://127.0.0.1:${serverPort}/message?sessionId=non-existent-session-id`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ jsonrpc: "2.0", method: "ping", id: 99 }),
     });
 
@@ -495,6 +505,7 @@ describe("Bootstrap Entrypoint", () => {
         port: -1,
         host: "invalid-host-name-that-cannot-bind",
         authDir: tempDir,
+        internalKey: TEST_INTERNAL_KEY,
       }),
     ).rejects.toThrow();
   });
@@ -505,6 +516,7 @@ describe("Bootstrap Entrypoint", () => {
       host: "127.0.0.1",
       authDir: tempDir,
       webPanelEnabled: true,
+      internalKey: TEST_INTERNAL_KEY,
     });
 
     try {

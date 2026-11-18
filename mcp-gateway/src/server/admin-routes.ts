@@ -5,15 +5,18 @@ import { KNOWN_PROVIDERS } from "../types.ts";
 import { renderDashboardHtml } from "./web-panel.ts";
 import { toPublicAccount } from "./account-public.ts";
 import { requireBearerAuth } from "./auth.ts";
+import type { OAuthSessionManager } from "../auth/oauth-sessions.ts";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const ACCOUNT_ITEM_ROUTE = /^\/api\/accounts\/([^/]+)\/([^/]+)\/?$/;
+const OAUTH_STATUS_ROUTE = /^\/api\/oauth\/google\/status\/([^/]+)\/?$/;
 
 export interface AdminRouteOptions {
   webPanelEnabled?: boolean;
   internalKey: string;
   /** When true, caller already enforced bearer auth (unified gateway server). */
   skipAuth?: boolean;
+  oauthSessions?: OAuthSessionManager;
 }
 
 class PayloadTooLargeError extends Error {
@@ -77,7 +80,11 @@ export async function handleAdminRequest(
   const method = req.method?.toUpperCase() || "GET";
 
   const isAdminPath =
-    pathname === "/" || pathname === "/api/accounts" || ACCOUNT_ITEM_ROUTE.test(pathname);
+    pathname === "/" ||
+    pathname === "/api/accounts" ||
+    pathname === "/api/oauth/google/start" ||
+    ACCOUNT_ITEM_ROUTE.test(pathname) ||
+    OAUTH_STATUS_ROUTE.test(pathname);
   if (!isAdminPath) {
     return false;
   }
@@ -103,6 +110,71 @@ export async function handleAdminRequest(
     } catch (err) {
       sendJson(res, 500, { error: err instanceof Error ? err.message : "Internal server error" });
     }
+    return true;
+  }
+
+  if (pathname === "/api/oauth/google/start") {
+    if (method !== "POST") {
+      res.writeHead(405, { "Content-Type": "application/json", Allow: "POST" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return true;
+    }
+    if (!options.oauthSessions) {
+      sendJson(res, 503, { error: "OAuth session manager is not available" });
+      return true;
+    }
+    let body: Record<string, unknown>;
+    try {
+      body = await readJsonBody(req);
+    } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        res.writeHead(413, { "Content-Type": "application/json", Connection: "close" });
+        res.end(JSON.stringify({ error: "Payload too large" }));
+        return true;
+      }
+      sendJson(res, 400, { error: err instanceof Error ? err.message : "Invalid request body" });
+      return true;
+    }
+    const alias = typeof body.alias === "string" && body.alias.trim() ? body.alias.trim() : "default";
+    try {
+      const session = await options.oauthSessions.startGoogle(alias);
+      sendJson(res, 201, {
+        success: true,
+        sessionId: session.id,
+        authorizeUrl: session.authorizeUrl,
+        status: session.status,
+        alias: session.alias,
+      });
+    } catch (err) {
+      sendJson(res, 400, { error: err instanceof Error ? err.message : "Failed to start Google OAuth" });
+    }
+    return true;
+  }
+
+  const oauthStatusMatch = pathname.match(OAUTH_STATUS_ROUTE);
+  if (oauthStatusMatch) {
+    if (method !== "GET") {
+      res.writeHead(405, { "Content-Type": "application/json", Allow: "GET" });
+      res.end(JSON.stringify({ error: "Method not allowed" }));
+      return true;
+    }
+    if (!options.oauthSessions) {
+      sendJson(res, 503, { error: "OAuth session manager is not available" });
+      return true;
+    }
+    let sessionId: string;
+    try {
+      sessionId = decodeURIComponent(oauthStatusMatch[1]);
+    } catch {
+      sendJson(res, 400, { error: "Malformed URL encoding in route parameters" });
+      return true;
+    }
+    const session = options.oauthSessions.getSession(sessionId);
+    if (!session) {
+      sendJson(res, 404, { error: "OAuth session not found" });
+      return true;
+    }
+    sendJson(res, 200, session);
     return true;
   }
 

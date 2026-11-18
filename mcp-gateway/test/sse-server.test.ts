@@ -433,12 +433,13 @@ describe("MCP Protocol over SSE Integration", () => {
 
     await client.connect(transport);
 
-    await expect(
-      client.callTool({
-        name: "github__work__failing_action",
-        arguments: {},
-      }),
-    ).rejects.toThrow("Deliberate execution failure");
+    const callResult = (await client.callTool({
+      name: "github__work__failing_action",
+      arguments: {},
+    })) as { isError?: boolean; content: Array<{ type: string; text: string }> };
+
+    expect(callResult.isError).toBe(true);
+    expect(callResult.content[0]?.text).toContain("Deliberate execution failure");
 
     await client.close();
   });

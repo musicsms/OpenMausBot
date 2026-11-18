@@ -1,14 +1,17 @@
-# mcp-gateway (PAT / local-dev MVP)
+# mcp-gateway (Phase-1 auth)
 
 Loopback-only sidecar that exposes provider tools to OpenMausBot over MCP SSE.
-This slice is a **local PAT gateway with bearer-gated SSE** — not a complete
-multi-account OAuth product. OAuth consent UI, live token refresh registration,
-and AES-at-rest wiring are deferred.
+Supports PAT accounts plus **Google OAuth** (consent + refresh), optional
+AES-256-GCM auth-dir encryption, and a structured tool-error contract
+(`auth_required`, rate-limit retries, Zod param validation).
 
 ## Requirements
 
 - Node.js 24+
 - A stable `GATEWAY_INTERNAL_KEY` (required; gateway refuses to start without it)
+- For Google OAuth: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+- Optional: `AUTH_ENCRYPTION_KEY` (AES-256-GCM at rest). Set
+  `AUTH_ENCRYPTION_REQUIRED=1` to refuse start when the key is missing.
 
 ## Quick start
 
@@ -17,6 +20,8 @@ and AES-at-rest wiring are deferred.
 pnpm install
 export GATEWAY_INTERNAL_KEY="$(openssl rand -hex 24)"
 export AUTH_DIR="$HOME/.mcp-gateway/auth"
+# optional encryption:
+# export AUTH_ENCRYPTION_KEY="$(openssl rand -hex 32)"
 pnpm --filter mcp-gateway start
 ```
 
@@ -26,22 +31,42 @@ Endpoints (default `http://127.0.0.1:8318`):
 | --- | --- | --- |
 | `/healthz` | none | liveness |
 | `/sse`, `/message` | `Authorization: Bearer <GATEWAY_INTERNAL_KEY>` | MCP SSE |
-| `/`, `/api/*` | same bearer | admin dashboard + account API |
+| `/`, `/api/*` | same bearer | admin dashboard + account / OAuth API |
 
 Bind stays on loopback. Non-loopback `HOST` is rejected unless
 `GATEWAY_ALLOW_NON_LOOPBACK=1` is set **and** `GATEWAY_INTERNAL_KEY` is present.
 
-## Add a PAT
+## Add credentials
+
+### PAT / API key
 
 ```bash
 pnpm --filter mcp-gateway cli -- auth github --alias work --pat ghp_xxx
 ```
 
+### Google OAuth
+
+```bash
+export GOOGLE_CLIENT_ID=...
+export GOOGLE_CLIENT_SECRET=...
+pnpm --filter mcp-gateway cli -- auth google --alias work
+```
+
+The CLI starts a loopback callback, prints an authorize URL, exchanges the
+code, and saves tokens under `AUTH_DIR`. The dashboard “Connect Google”
+control uses `POST /api/oauth/google/start` + status polling the same way.
+
 Admin HTTP also accepts `POST /api/accounts` with a bearer, but responses never
 echo `apiKey` or OAuth tokens — only metadata such as `hasApiKey` /
 `tokenExpiresAt`.
 
-Credentials live under `AUTH_DIR` as `0600` JSON files (plaintext v1 posture).
+Credentials live under `AUTH_DIR` as `0600` files. Without
+`AUTH_ENCRYPTION_KEY` they are plaintext JSON (v1 posture). With the key set,
+saves are AES-256-GCM; existing plaintext files still load and are rewritten
+encrypted on the next save.
+
+Google refresh tokens are refreshed in the background when a handler is
+registered at bootstrap (Google is wired; missing handlers no-op safely).
 
 ## Connect OpenMausBot
 
@@ -78,8 +103,6 @@ pnpm --filter mcp-gateway test
 
 ## Out of scope (later slices)
 
-- Live OAuth start / callback / token exchange in CLI or dashboard
-- Registered provider refresh handlers at bootstrap
-- AES-GCM encryption for auth-dir
 - Custom REST YAML load + SSRF controls
 - OpenMausBot Settings 1-click UX
+- Public / non-loopback production bind

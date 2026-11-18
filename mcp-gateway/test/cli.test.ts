@@ -203,7 +203,53 @@ describe("CLI Runner", () => {
     expect(saved?.apiKey).toBe("ghp_my_token");
   });
 
-  it("rejects OAuth-less auth and points at PAT usage for the MVP", async () => {
+  it("starts Google OAuth consent when --pat is omitted", async () => {
+    const logs: string[] = [];
+    const opened: string[] = [];
+    const code = await runCli(["auth", "google", "--alias", "work"], {
+      config: {
+        host: "127.0.0.1",
+        port: 8318,
+        authDir: tempDir,
+        internalKey: "test",
+        webPanelEnabled: true,
+      },
+      store,
+      env: {
+        GOOGLE_CLIENT_ID: "client-id",
+        GOOGLE_CLIENT_SECRET: "client-secret",
+      },
+      openUrl: (url) => {
+        opened.push(url);
+      },
+      runGoogleConsent: async (deps) => {
+        await deps.store.saveAccount({
+          provider: "google",
+          alias: deps.alias,
+          createdAt: 1,
+          updatedAt: 1,
+          tokens: { accessToken: "ya29.from-oauth", refreshToken: "1//refresh" },
+        });
+        deps.log?.(`Successfully saved google:${deps.alias} via OAuth.`);
+        return {
+          provider: "google",
+          alias: deps.alias,
+          authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth?mock=1",
+        };
+      },
+      io: {
+        log: (msg) => logs.push(String(msg)),
+      },
+    });
+
+    expect(code).toBe(0);
+    expect(logs.some((l) => l.includes("Successfully saved google:work via OAuth"))).toBe(true);
+    const saved = await store.getAccount("google", "work");
+    expect(saved?.tokens?.accessToken).toBe("ya29.from-oauth");
+    expect(opened).toEqual([]);
+  });
+
+  it("fails Google OAuth when client credentials are missing", async () => {
     const errors: string[] = [];
     let exitCode: number | undefined;
     const code = await runCli(["auth", "google", "--alias", "work"], {
@@ -215,6 +261,7 @@ describe("CLI Runner", () => {
         webPanelEnabled: true,
       },
       store,
+      env: {},
       io: {
         error: (msg) => errors.push(String(msg)),
         exit: (c) => { exitCode = c; },
@@ -223,7 +270,23 @@ describe("CLI Runner", () => {
 
     expect(code).toBe(1);
     expect(exitCode).toBe(1);
-    expect(errors.some((l) => l.includes("OAuth consent is not available in this PAT MVP build"))).toBe(true);
+    expect(errors.some((l) => l.includes("GOOGLE_CLIENT_ID"))).toBe(true);
+  });
+
+  it("points non-Google providers without --pat at PAT usage", async () => {
+    const errors: string[] = [];
+    let exitCode: number | undefined;
+    const code = await runCli(["auth", "github", "--alias", "work"], {
+      store,
+      io: {
+        error: (msg) => errors.push(String(msg)),
+        exit: (c) => { exitCode = c; },
+      },
+    });
+
+    expect(code).toBe(1);
+    expect(exitCode).toBe(1);
+    expect(errors.some((l) => l.includes('OAuth consent for "github" is not wired yet'))).toBe(true);
     expect(errors.some((l) => l.includes("--pat <token>"))).toBe(true);
   });
 

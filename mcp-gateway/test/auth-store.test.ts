@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AuthStore } from "../src/storage/auth-store.ts";
@@ -115,5 +115,77 @@ describe("Storage Crypto", () => {
 
     const tampered = encrypted.slice(0, -4) + "0000";
     expect(() => decryptPayload(tampered, secretKey)).toThrow();
+  });
+});
+
+describe("AuthStore encryption", () => {
+  const secretKey = "a-secure-key-with-at-least-32-chars!!";
+  let testDir: string;
+
+  beforeEach(async () => {
+    testDir = await mkdtemp(join(tmpdir(), "auth-store-enc-"));
+  });
+
+  afterEach(async () => {
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  it("round-trips accounts when AUTH encryption key is set", async () => {
+    const store = new AuthStore(testDir, secretKey);
+    await store.saveAccount({
+      provider: "google",
+      alias: "work",
+      createdAt: 1000,
+      updatedAt: 1000,
+      tokens: { accessToken: "tok-enc", refreshToken: "ref-enc" },
+    });
+
+    const raw = await readFile(join(testDir, "google_work.json"), "utf-8");
+    expect(raw.trim().startsWith("{")).toBe(false);
+    expect(raw).not.toContain("tok-enc");
+
+    const retrieved = await store.getAccount("google", "work");
+    expect(retrieved?.tokens?.accessToken).toBe("tok-enc");
+    expect(retrieved?.tokens?.refreshToken).toBe("ref-enc");
+  });
+
+  it("loads plaintext files and rewrites them encrypted on next save", async () => {
+    await writeFile(
+      join(testDir, "google_legacy.json"),
+      JSON.stringify({
+        provider: "google",
+        alias: "legacy",
+        createdAt: 1,
+        updatedAt: 1,
+        tokens: { accessToken: "plain-token" },
+      }),
+      { mode: 0o600 },
+    );
+
+    const store = new AuthStore(testDir, secretKey);
+    const loaded = await store.getAccount("google", "legacy");
+    expect(loaded?.tokens?.accessToken).toBe("plain-token");
+
+    await store.saveAccount({
+      ...loaded!,
+      updatedAt: 2,
+    });
+
+    const raw = await readFile(join(testDir, "google_legacy.json"), "utf-8");
+    expect(raw).not.toContain("plain-token");
+    expect((await store.getAccount("google", "legacy"))?.tokens?.accessToken).toBe("plain-token");
+  });
+
+  it("keeps plaintext posture when no encryption key is configured", async () => {
+    const store = new AuthStore(testDir);
+    await store.saveAccount({
+      provider: "github",
+      alias: "bot",
+      createdAt: 1,
+      updatedAt: 1,
+      apiKey: "ghp_plain",
+    });
+    const raw = await readFile(join(testDir, "github_bot.json"), "utf-8");
+    expect(raw).toContain("ghp_plain");
   });
 });

@@ -175,16 +175,47 @@ describe("E2E Gateway -> OpenMausBot Client", () => {
 
     await client.connect(transport);
 
-    await expect(
-      client.callTool({
-        name: "google__work__gmail_send_mail",
-        arguments: {
-          to: "nonexistent@example.com",
-          subject: "Test",
-          body: "Payload",
-        },
-      }),
-    ).rejects.toThrow("Gmail API error (400)");
+    const callResult = (await client.callTool({
+      name: "google__work__gmail_send_mail",
+      arguments: {
+        to: "nonexistent@example.com",
+        subject: "Test",
+        body: "Payload",
+      },
+    })) as { isError?: boolean; content: Array<{ type: string; text: string }> };
+
+    expect(callResult.isError).toBe(true);
+    expect(callResult.content[0]?.text).toContain("upstream_error");
+    expect(callResult.content[0]?.text).toContain("Gmail API error (400)");
+
+    await client.close();
+  });
+
+  it("returns auth_required isError payload when credentials are missing", async () => {
+    await store.deleteAccount("google", "work");
+    await store.saveAccount({
+      provider: "google",
+      alias: "work",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    const transport = new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), sseAuthOptions());
+    const client = new Client({ name: "omb-client", version: "1.0.0" }, { capabilities: {} });
+    await client.connect(transport);
+
+    const callResult = (await client.callTool({
+      name: "google__work__gmail_send_mail",
+      arguments: { to: "a@b.com", subject: "S", body: "B" },
+    })) as { isError?: boolean; content: Array<{ type: string; text: string }> };
+
+    expect(callResult.isError).toBe(true);
+    const payload = JSON.parse(callResult.content[0].text);
+    expect(payload).toMatchObject({
+      code: "auth_required",
+      provider: "google",
+      alias: "work",
+    });
 
     await client.close();
   });

@@ -1,5 +1,8 @@
 import type { GatewayToolDefinition, ServiceAdapter } from "./base-adapter.ts";
 import type { AccountCredential, ProviderType } from "../types.ts";
+import { GatewayToolError, requireAccountToken, throwForUpstreamStatus } from "../errors.ts";
+import { fetchWith429Retry, readRetryAfterSeconds } from "../http-retry.ts";
+import { notionSearchSchema, parseToolArgs } from "../tool-args.ts";
 
 export class NotionAdapter implements ServiceAdapter {
   readonly provider: ProviderType = "notion";
@@ -17,24 +20,28 @@ export class NotionAdapter implements ServiceAdapter {
           required: ["query"],
         },
         execute: async (args, cred: AccountCredential) => {
-          const token = cred.apiKey || cred.tokens?.accessToken;
-          if (!token) throw new Error(`Missing token for account '${alias}'`);
-          if (typeof args.query !== "string") {
-            throw new Error("Missing required argument 'query'");
-          }
+          const token = requireAccountToken(cred);
+          const parsed = parseToolArgs(notionSearchSchema, args);
 
-          const res = await fetch("https://api.notion.com/v1/search", {
+          const res = await fetchWith429Retry("https://api.notion.com/v1/search", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
               "Notion-Version": "2022-06-28",
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ query: args.query, page_size: 5 }),
+            body: JSON.stringify({ query: parsed.query, page_size: 5 }),
           });
 
           if (!res.ok) {
-            throw new Error(`Notion API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "notion",
+              alias,
+              res.status,
+              await res.text(),
+              "Notion",
+              readRetryAfterSeconds(res),
+            );
           }
           const result = (await res.json()) as { results?: unknown[] };
           return { text: JSON.stringify(result.results || [], null, 2) };
@@ -53,10 +60,9 @@ export class NotionAdapter implements ServiceAdapter {
           required: ["database_id"],
         },
         execute: async (args, cred: AccountCredential) => {
-          const token = cred.apiKey || cred.tokens?.accessToken;
-          if (!token) throw new Error(`Missing token for account '${alias}'`);
+          const token = requireAccountToken(cred);
           if (!args.database_id || typeof args.database_id !== "string") {
-            throw new Error("Missing required argument 'database_id'");
+            throw new GatewayToolError("Missing required argument 'database_id'", "invalid_params");
           }
 
           const payload: Record<string, unknown> = {
@@ -66,7 +72,7 @@ export class NotionAdapter implements ServiceAdapter {
             payload.filter = args.filter;
           }
 
-          const res = await fetch(
+          const res = await fetchWith429Retry(
             `https://api.notion.com/v1/databases/${encodeURIComponent(args.database_id)}/query`,
             {
               method: "POST",
@@ -80,7 +86,14 @@ export class NotionAdapter implements ServiceAdapter {
           );
 
           if (!res.ok) {
-            throw new Error(`Notion API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "notion",
+              alias,
+              res.status,
+              await res.text(),
+              "Notion",
+              readRetryAfterSeconds(res),
+            );
           }
           const result = (await res.json()) as { results?: unknown[] };
           return { text: JSON.stringify(result.results || [], null, 2) };

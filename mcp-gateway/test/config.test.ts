@@ -50,4 +50,21 @@ describe("Gateway Config", () => {
     expect(isLoopbackHost("localhost")).toBe(true);
     expect(isLoopbackHost("0.0.0.0")).toBe(false);
   });
+
+  it("loads AUTH_ENCRYPTION_KEY when present", () => {
+    const config = loadConfig({
+      GATEWAY_INTERNAL_KEY: "stable-test-key",
+      AUTH_ENCRYPTION_KEY: "enc-secret",
+    });
+    expect(config.authEncryptionKey).toBe("enc-secret");
+  });
+
+  it("refuses start when AUTH_ENCRYPTION_REQUIRED=1 without a key", () => {
+    expect(() =>
+      loadConfig({
+        GATEWAY_INTERNAL_KEY: "stable-test-key",
+        AUTH_ENCRYPTION_REQUIRED: "1",
+      }),
+    ).toThrow(/AUTH_ENCRYPTION_REQUIRED=1/);
+  });
 });

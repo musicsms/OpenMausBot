@@ -115,7 +115,7 @@ describe("Service Adapters", () => {
 
       await expect(
         sendTool.execute({ to: "a@b.com", subject: "S", body: "B" }, credWithoutToken),
-      ).rejects.toThrow("Missing access token for account 'work'");
+      ).rejects.toMatchObject({ code: "auth_required", details: { provider: "google", alias: "work" } });
 
       const credWithToken: AccountCredential = {
         provider: "google",
@@ -127,7 +127,7 @@ describe("Service Adapters", () => {
 
       await expect(
         sendTool.execute({ to: "", subject: "S", body: "B" }, credWithToken),
-      ).rejects.toThrow("Missing required argument 'to'");
+      ).rejects.toMatchObject({ code: "invalid_params" });
 
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -137,7 +137,7 @@ describe("Service Adapters", () => {
 
       await expect(
         sendTool.execute({ to: "a@b.com", subject: "S", body: "B" }, credWithToken),
-      ).rejects.toThrow("Gmail API error (403): Insufficient permission");
+      ).rejects.toMatchObject({ code: "auth_required", details: { provider: "google", alias: "work" } });
     });
 
     it("searches emails via gmail_search", async () => {
@@ -403,9 +403,10 @@ describe("Service Adapters", () => {
         updatedAt: Date.now(),
       };
 
-      await expect(listTool.execute({}, noTokenCred)).rejects.toThrow(
-        "Missing token for account 'dev'",
-      );
+      await expect(listTool.execute({}, noTokenCred)).rejects.toMatchObject({
+        code: "auth_required",
+        details: { provider: "github", alias: "dev" },
+      });
 
       const validCred: AccountCredential = {
         provider: "github",
@@ -415,9 +416,9 @@ describe("Service Adapters", () => {
         apiKey: "ghp_tok",
       };
 
-      await expect(getIssueTool.execute({ owner: "o" }, validCred)).rejects.toThrow(
-        "Missing required argument 'repo'",
-      );
+      await expect(getIssueTool.execute({ owner: "o" }, validCred)).rejects.toMatchObject({
+        code: "invalid_params",
+      });
 
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -427,7 +428,7 @@ describe("Service Adapters", () => {
 
       await expect(
         getIssueTool.execute({ owner: "o", repo: "r", issue_number: 1 }, validCred),
-      ).rejects.toThrow("GitHub API error (404): Not Found");
+      ).rejects.toMatchObject({ code: "upstream_error" });
     });
   });
 });

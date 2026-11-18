@@ -1,5 +1,14 @@
 import type { GatewayToolDefinition, ServiceAdapter } from "./base-adapter.ts";
 import type { ProviderType } from "../types.ts";
+import { requireAccountToken, throwForUpstreamStatus } from "../errors.ts";
+import { fetchWith429Retry, readRetryAfterSeconds } from "../http-retry.ts";
+import {
+  calendarListSchema,
+  driveSearchSchema,
+  gmailSearchSchema,
+  gmailSendSchema,
+  parseToolArgs,
+} from "../tool-args.ts";
 
 export class GoogleAdapter implements ServiceAdapter {
   readonly provider: ProviderType = "google";
@@ -19,19 +28,16 @@ export class GoogleAdapter implements ServiceAdapter {
           required: ["to", "subject", "body"],
         },
         execute: async (args, cred) => {
-          const token = cred.tokens?.accessToken || cred.apiKey;
-          if (!token) throw new Error(`Missing access token for account '${alias}'`);
-          if (!args.to || typeof args.to !== "string") throw new Error("Missing required argument 'to'");
-          if (typeof args.subject !== "string") throw new Error("Missing required argument 'subject'");
-          if (typeof args.body !== "string") throw new Error("Missing required argument 'body'");
+          const token = requireAccountToken(cred, "oauth");
+          const parsed = parseToolArgs(gmailSendSchema, args);
 
-          const to = args.to.replace(/[\r\n]/g, "");
-          const subject = args.subject.replace(/[\r\n]/g, "");
+          const to = parsed.to.replace(/[\r\n]/g, "");
+          const subject = parsed.subject.replace(/[\r\n]/g, "");
           const rawMessage = Buffer.from(
-            `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${args.body}`,
+            `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${parsed.body}`,
           ).toString("base64url");
 
-          const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+          const res = await fetchWith429Retry("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -41,7 +47,14 @@ export class GoogleAdapter implements ServiceAdapter {
           });
 
           if (!res.ok) {
-            throw new Error(`Gmail API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "google",
+              alias,
+              res.status,
+              await res.text(),
+              "Gmail",
+              readRetryAfterSeconds(res),
+            );
           }
           const result = (await res.json()) as { id?: string };
           return { text: `Email sent successfully (id: ${result.id})` };
@@ -59,22 +72,28 @@ export class GoogleAdapter implements ServiceAdapter {
           required: ["query"],
         },
         execute: async (args, cred) => {
-          const token = cred.tokens?.accessToken || cred.apiKey;
-          if (!token) throw new Error(`Missing access token for account '${alias}'`);
-          if (!args.query || typeof args.query !== "string") throw new Error("Missing required argument 'query'");
+          const token = requireAccountToken(cred, "oauth");
+          const parsed = parseToolArgs(gmailSearchSchema, args);
 
-          const maxResults = typeof args.maxResults === "number" && args.maxResults > 0 ? args.maxResults : 10;
+          const maxResults = parsed.maxResults && parsed.maxResults > 0 ? parsed.maxResults : 10;
           const params = new URLSearchParams({
-            q: args.query,
+            q: parsed.query,
             maxResults: String(maxResults),
           });
           const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`;
-          const res = await fetch(url, {
+          const res = await fetchWith429Retry(url, {
             headers: { Authorization: `Bearer ${token}` },
           });
 
           if (!res.ok) {
-            throw new Error(`Gmail API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "google",
+              alias,
+              res.status,
+              await res.text(),
+              "Gmail",
+              readRetryAfterSeconds(res),
+            );
           }
           const data = (await res.json()) as { messages?: unknown[] };
           return { text: JSON.stringify(data.messages || [], null, 2) };
@@ -90,9 +109,9 @@ export class GoogleAdapter implements ServiceAdapter {
           },
         },
         execute: async (args, cred) => {
-          const token = cred.tokens?.accessToken || cred.apiKey;
-          if (!token) throw new Error(`Missing access token for account '${alias}'`);
-          const maxResults = typeof args.maxResults === "number" && args.maxResults > 0 ? args.maxResults : 10;
+          const token = requireAccountToken(cred, "oauth");
+          const parsed = parseToolArgs(calendarListSchema, args);
+          const maxResults = parsed.maxResults && parsed.maxResults > 0 ? parsed.maxResults : 10;
           const params = new URLSearchParams({
             maxResults: String(maxResults),
             orderBy: "startTime",
@@ -100,12 +119,19 @@ export class GoogleAdapter implements ServiceAdapter {
             timeMin: new Date().toISOString(),
           });
           const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`;
-          const res = await fetch(url, {
+          const res = await fetchWith429Retry(url, {
             headers: { Authorization: `Bearer ${token}` },
           });
 
           if (!res.ok) {
-            throw new Error(`Calendar API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "google",
+              alias,
+              res.status,
+              await res.text(),
+              "Calendar",
+              readRetryAfterSeconds(res),
+            );
           }
           const data = (await res.json()) as { items?: unknown[] };
           return { text: JSON.stringify(data.items || [], null, 2) };
@@ -122,23 +148,30 @@ export class GoogleAdapter implements ServiceAdapter {
           },
         },
         execute: async (args, cred) => {
-          const token = cred.tokens?.accessToken || cred.apiKey;
-          if (!token) throw new Error(`Missing access token for account '${alias}'`);
-          const pageSize = typeof args.pageSize === "number" && args.pageSize > 0 ? args.pageSize : 10;
+          const token = requireAccountToken(cred, "oauth");
+          const parsed = parseToolArgs(driveSearchSchema, args);
+          const pageSize = parsed.pageSize && parsed.pageSize > 0 ? parsed.pageSize : 10;
           const params = new URLSearchParams({
             pageSize: String(pageSize),
             fields: "files(id,name,mimeType,modifiedTime,webViewLink)",
           });
-          if (typeof args.query === "string" && args.query) {
-            params.set("q", args.query);
+          if (parsed.query) {
+            params.set("q", parsed.query);
           }
           const url = `https://www.googleapis.com/drive/v3/files?${params.toString()}`;
-          const res = await fetch(url, {
+          const res = await fetchWith429Retry(url, {
             headers: { Authorization: `Bearer ${token}` },
           });
 
           if (!res.ok) {
-            throw new Error(`Drive API error (${res.status}): ${await res.text()}`);
+            throwForUpstreamStatus(
+              "google",
+              alias,
+              res.status,
+              await res.text(),
+              "Drive",
+              readRetryAfterSeconds(res),
+            );
           }
           const data = (await res.json()) as { files?: unknown[] };
           return { text: JSON.stringify(data.files || [], null, 2) };

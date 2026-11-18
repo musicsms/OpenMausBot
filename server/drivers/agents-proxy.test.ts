@@ -470,7 +470,6 @@ beforeAll(async () => {
       OMB_BOT_ID: "bot-asker",
       OMB_THREAD_ID: "thread-asker-routine",
       OMB_COMMS_TOKEN: TOKEN,
-      OMB_TURN_DEPTH: "0",
       OMB_SKILL_AUTHORING_ENABLED: "1",
       OMB_SHARED_COMPUTERS_ENABLED: "1",
       // A Chief's turn, so the Chief-only team tools are mounted too.
@@ -647,6 +646,7 @@ describe("agents-proxy MCP surface", () => {
       "select_computer",
       "list_threads",
       "close_thread",
+      "rename_thread",
       "start_thread",
       "burst",
       "list_models",
@@ -687,6 +687,7 @@ describe("agents-proxy MCP surface", () => {
       "skills_list",
       "skill_manage",
       "mcp_server",
+      "app_settings",
     ]);
     const tool = (name: string) => list.result.tools.find((entry: { name: string }) => entry.name === name);
     const coordinate = tool("coordinate_bots");
@@ -1000,7 +1001,7 @@ describe("agents-proxy MCP surface", () => {
       expect(text).toContain("do not check or wait for it in this turn");
       expect(text).not.toMatch(/Deprecated|alias/);
       expect(lastThreadBody).toEqual({
-        fromBotId: "bot-asker", fromThreadId: "thread-asker-routine", title: "QA: PR #9", message: "Review the login fix.", depth: 0, toBotId: "bot-helper",
+        fromBotId: "bot-asker", fromThreadId: "thread-asker-routine", title: "QA: PR #9", message: "Review the login fix.", toBotId: "bot-helper",
       });
     } finally {
       threadResponse = previous;
@@ -1029,7 +1030,7 @@ describe("agents-proxy MCP surface", () => {
       expect(text).toContain("its result comes back to this conversation and resumes you automatically (assignment id: asg-own-1)");
       expect(text).toContain("finish your turn");
       expect(lastThreadBody).toEqual({ fromBotId: "bot-asker", fromThreadId: "thread-asker-routine", title: "Review: GPT", message: "Review the diff.",
-        depth: 0, modelSelection, reportBack: true });
+        modelSelection, reportBack: true });
     } finally {
       threadResponse = previous;
     }
@@ -1046,7 +1047,6 @@ describe("agents-proxy MCP surface", () => {
       fromThreadId: "thread-asker-routine",
       title: "QA: PR #1",
       message: "Review the login fix.",
-      depth: 0,
     });
     threadResponse = { threadId: "thread-two", title: "QA: PR #2", botId: "bot-asker", botName: "Asker", self: true, state: "queued", position: 2, limit: 3 };
     const queued = await callTool("start_thread", { title: "QA: PR #2", message: "Review the signup fix.", folder: "QA" });
@@ -1756,6 +1756,24 @@ describe("agents-proxy MCP surface", () => {
     });
   });
 
+  it("tells a one-time routine given a timeZone that its zone is the offset in at", async () => {
+    lastRoutineRequestBody = null;
+    const res = await callTool("create_trigger", { when: "schedule",
+      name: "One check",
+      instructions: "Check the release page.",
+      schedule: { type: "once", at: "2026-09-01T09:00:00+08:00", timeZone: "Asia/Shanghai" },
+    });
+    expect(res.result.isError).toBe(true);
+    expect(lastRoutineRequestBody).toBeNull();
+    const text = res.result.content[0].text;
+    expect(text).toContain('A once schedule takes no "timeZone"');
+    expect(text).toContain('offset inside "at"');
+    expect(text).not.toContain("Weekly and daily times");
+    const list = await rpc("tools/list");
+    const routine = list.result.tools.find((entry: { name: string }) => entry.name === "trigger");
+    expect(routine.inputSchema.properties.schedule.properties.timeZone.description).toMatch(/^Only for cron/);
+  });
+
   it("proposes an interval routine with an optional start anchor", async () => {
     await callTool("create_trigger", { when: "schedule",
       name: "Frequent check",
@@ -2005,7 +2023,7 @@ describe("agents-proxy MCP surface", () => {
     lastProfileRequestBody = null;
     const res = await callTool("propose_profile", { reason: "asked" });
     expect(res.result.isError).toBe(true);
-    expect(res.result.content[0].text).toContain("needs at least one of name, title, description, soul, cwd, notifications, or speakReplies");
+    expect(res.result.content[0].text).toContain("needs at least one of name, title, description, soul, cwd, notifications, speakReplies, or browserProfile");
     expect(lastProfileRequestBody).toBeNull();
   });
 
@@ -2198,7 +2216,7 @@ describe("standing external runtime", () => {
   beforeAll(async () => {
     external = spawn(process.execPath, [PROXY], {
       env: { ...childEnv(), OMB_HARNESS_URL: `http://127.0.0.1:${stubPort}`, OMB_BOT_ID: "bot-asker",
-        OMB_THREAD_ID: "thread-asker-routine", OMB_COMMS_TOKEN: TOKEN, OMB_TURN_DEPTH: "0",
+        OMB_THREAD_ID: "thread-asker-routine", OMB_COMMS_TOKEN: TOKEN,
         OMB_EXTERNAL_RUNTIME: "1", OMB_ROOM_TURN: "1", OMB_OWN_THREAD_CREATION: "1",
         OMB_SKILL_AUTHORING_ENABLED: "1", OMB_SHARED_COMPUTERS_ENABLED: "1" },
       stdio: ["pipe", "pipe", "inherit"],
@@ -2296,7 +2314,6 @@ describe("with computer sharing off and no Chief of Staff (the defaults)", () =>
         OMB_BOT_ID: "bot-asker",
         OMB_THREAD_ID: "thread-asker-routine",
         OMB_COMMS_TOKEN: TOKEN,
-        OMB_TURN_DEPTH: "0",
         OMB_SKILL_AUTHORING_ENABLED: "1",
         // deliberately no OMB_SHARED_COMPUTERS_ENABLED or OMB_CHIEF_OF_STAFF
       },
@@ -2448,7 +2465,7 @@ describe("tool bridge", () => {
     const proxy = spawn(process.execPath, [PROXY], {
       env: {
         ...childEnv(), TZ: "Asia/Kolkata", OMB_HARNESS_URL: `http://127.0.0.1:${stubPort}`, OMB_BOT_ID: "bot-asker",
-        OMB_THREAD_ID: "thread-asker-routine", OMB_COMMS_TOKEN: TOKEN, OMB_TURN_DEPTH: "0", ...env,
+        OMB_THREAD_ID: "thread-asker-routine", OMB_COMMS_TOKEN: TOKEN, ...env,
       },
       stdio: ["pipe", "pipe", "inherit"],
     });

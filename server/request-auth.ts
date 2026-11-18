@@ -311,6 +311,9 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["GET"], path: /^\/api\/updates\/check$/ },
   { methods: ["POST"], path: /^\/api\/auth\/stream-ticket$/ },
   { methods: ["POST"], path: /^\/api\/auth\/logout$/ },
+  // A Team Cloud member's own themes: the route answers each person with theirs alone, and a limited session elsewhere with none.
+  { methods: ["GET", "PUT", "PATCH", "POST", "DELETE"], path: /^\/api\/themes(?:\/[a-z0-9-]+(?:\/(?:duplicate|export))?)?$/ },
+  { methods: ["GET", "HEAD"], path: /^\/api\/theme-assets\/[a-z0-9-]+\/[\w.-]+$/ },
   // A Team Cloud member's own phone: the code carries their address and role, never more (routes/team-phone.ts).
   { methods: ["POST"], path: /^\/api\/team\/phone-pairing$/ },
   // The phones those codes opened: a member lists and removes their own only (routes/team-phone.ts visiblePhones).
@@ -359,6 +362,7 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["DELETE"], path: /^\/api\/bots\/[\w-]+\/queue\/[\w-]+$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/queue\/[\w-]+\/steer$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/tasks$/ },
+  { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/tasks\/[\w-]+\/forks$/ },
   { methods: ["POST", "PATCH", "DELETE"], path: /^\/api\/bots\/[\w-]+\/tasks\/[\w-]+$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/tasks\/[\w-]+\/title$/ },
   { methods: ["PATCH"], path: /^\/api\/bots\/[\w-]+\/profile$/ },
@@ -406,6 +410,7 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["DELETE"], path: /^\/api\/groups\/[\w-]+\/queue\/[\w-]+$/ },
   { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/queue\/[\w-]+\/steer$/ },
   { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/tasks$/ },
+  { methods: ["POST"], path: /^\/api\/groups\/[\w-]+\/tasks\/[\w-]+\/forks$/ },
   { methods: ["POST", "PATCH", "DELETE"], path: /^\/api\/groups\/[\w-]+\/tasks\/[\w-]+$/ },
   { methods: ["PATCH"], path: /^\/api\/groups\/[\w-]+$/ }, // display fields only: see clientGroupPatchViolation
   { methods: ["POST"], path: /^\/api\/threads\/[\w-]+\/messages\/[\w-]+\/reactions$/ },
@@ -464,6 +469,7 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["GET"], path: /^\/api\/needs-you$/ },
   // a person's own inbox: its lines, how many wait, and one of them read or done; the handler serves the session's own alone
   { methods: ["GET"], path: /^\/api\/inbox(?:\/count)?$/ },
+  { methods: ["POST"], path: /^\/api\/inbox\/read-all$/ },
   { methods: ["POST"], path: /^\/api\/inbox\/[\w-]+\/(?:read|done)$/ },
   // who a Team Cloud bot can report to, and handing over a bot the member owns: the handler checks who may
   { methods: ["GET"], path: /^\/api\/team\/people$/ },
@@ -533,11 +539,11 @@ export function botProfileSettings(fields: Record<string, unknown>): Record<stri
   return Object.fromEntries(Object.entries(fields).filter(([key]) => BOT_PROFILE_SETTINGS.has(key)));
 }
 
-/** What a Team Cloud member who can edit a bot may change: its profile and model (as a bot they bring in), and which of
- * the team's connected apps and MCP servers it uses. Never what it may do on its computer, where it runs, its department
- * or whom it answers to or directs: those stay an admin's. */
+/** What a Team Cloud member who can edit a bot may change: its profile and model (as a bot they bring in), which of the
+ * team's connected apps and MCP servers it uses, and which built-in tool groups it is shown. Never what it may do on its
+ * computer, where it runs, its department or whom it answers to or directs: those stay an admin's. */
 const EDITOR_BOT_PATCH_FIELDS: ReadonlySet<string> = new Set([
-  ...BOT_PROFILE_SETTINGS, "threadId", "composio", "connectorTools", "connectorScopes", "mcpServers",
+  ...BOT_PROFILE_SETTINGS, "threadId", "composio", "connectorTools", "connectorScopes", "mcpServers", "toolsOff",
 ]);
 /** A member who can only view a bot marks it read, nothing else. */
 const VIEWER_BOT_PATCH_FIELDS: ReadonlySet<string> = new Set(["unread"]);

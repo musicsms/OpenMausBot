@@ -8,7 +8,9 @@ import { CHAT_CARD_TOOL_DEFINITIONS } from "./agents-chat-card-tools.ts";
 import { DEVS_TOOL_DEFINITIONS } from "./agents-devs-tools.ts";
 import { HELPER_TOOL_DEFINITIONS } from "./agents-helper-tools.ts";
 import { USAGE_LIMITS_TOOL_DEFINITION } from "./agents-usage-tool.ts";
+import { APP_SETTINGS_TOOL_DEFINITION } from "./agents-app-settings-tool.ts";
 import { THREAD_POST_TOOL_DEFINITION } from "./agents-thread-post-tool.ts";
+import { RENAME_THREAD_TOOL_DEFINITION } from "./agents-thread-title-tool.ts";
 import { WAIT_TOOL_DEFINITIONS, WAIT_TOOL_NAMES } from "./agents-wait-tools.ts";
 import { COMPUTER_ASK_TOOL_DEFINITIONS, COMPUTER_ASK_TOOL_NAMES } from "./agents-computer-ask-tool.ts";
 import { IMAGE_TOOL_DEFINITIONS, IMAGE_TOOL_NAMES } from "./agents-image-tools.ts";
@@ -18,7 +20,7 @@ import { MAUSBOT_TOOL_DEFINITIONS } from "./agents-mausbot-tools.ts";
 import { PERSON_TOOL_DEFINITIONS } from "./agents-person-tools.ts";
 import { RESEARCH_TOOL_DEFINITIONS, RESEARCH_TOOL_NAMES, X_TOOL_NAMES } from "./agents-research-tools.ts";
 import type { CatalogProfile } from "./agents-catalog-profile.ts";
-import { advertisedSchema } from "./agents-schema.ts";
+import { advertisedSchema } from "./agents-schema.ts"; import { withoutToolsOff } from "./agents-tool-groups.ts";
 export { catalogProfileFromEnv, type CatalogProfile } from "./agents-catalog-profile.ts";
 
 export const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
@@ -44,7 +46,7 @@ const ROUTINE_SCHEDULE_SCHEMA = {
     timeZone: {
       type: "string",
       maxLength: 128,
-      description: "Required for cron: the person's IANA timezone, such as Asia/Kolkata or UTC; never a numeric offset or an abbreviation.",
+      description: "Only for cron, and required there: the person's IANA timezone, such as Asia/Kolkata or UTC; never a numeric offset or an abbreviation.",
     },
     at: {
       type: "string",
@@ -312,6 +314,7 @@ const TOOL_DEFINITIONS = [
       required: ["thread_id"],
     },
   },
+  RENAME_THREAD_TOOL_DEFINITION,
   {
     name: "start_thread",
     description:
@@ -375,7 +378,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "attach_file",
     description:
-      `Attach a finished file to the chat so the user can preview and download it: an image, video, audio clip, PDF, spreadsheet, slide deck or other document you made. Pass its path: a path inside your computer's /home/cua/workspace (for example /home/cua/workspace/report.pdf), or a file in your working folder. Do this instead of pasting a VM path as a link; a path inside a VM cannot be opened from chat. Supported: images (png, jpg, gif, webp), video (mp4, webm, mov), audio (mp3, m4a, aac, wav, ogg, opus, flac), pdf, Word/Excel/PowerPoint and OpenDocument files, and csv, tsv, txt, md, json, rtf. Up to ${limitMegabytes(FILE_MAX_BYTES)} MB (images 10 MB). Finish writing the file first, then call this directly: it reports an error if the file is missing, so you do not need to list or open the folder to check.`,
+      `Attach a finished file to the chat so the user can preview and download it: an image, video, audio clip, PDF, spreadsheet, slide deck or other document you made. Pass its path: a path inside your computer's /home/cua/workspace (for example /home/cua/workspace/report.pdf), or a file in your working folder. Do this instead of pasting a VM path as a link; a path inside a VM cannot be opened from chat. Supported: images (png, jpg, gif, webp), video (mp4, webm, mov), audio (mp3, m4a, aac, wav, ogg, opus, flac), pdf, Word/Excel/PowerPoint and OpenDocument files, csv, tsv, txt, md, json, rtf, and archives (zip, rar, 7z, tar, gz, tgz, bz2, xz). Up to ${limitMegabytes(FILE_MAX_BYTES)} MB (images 10 MB). Finish writing the file first, then call this directly: it reports an error if the file is missing, so you do not need to list or open the folder to check.`,
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -440,13 +443,13 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: "propose_team_setup",
-    description: "Chief of Staff only: submit all requested specialist creation, profile/model configuration, Chief assignments, and authorized team moves in ONE combined plan. Use exact catalog engine/model IDs from list_team_setup. Combine all fields for each bot; use the same create key or botId to coalesce repeated entries. New teams must be named explicitly in newTeams and have a specialist in this plan; access is granted only to those new teams. Existing unauthorized teams cannot be included. Models change bot defaults for groups/new threads; existing threads and execution permissions stay unchanged. If review is pending, the decision and structured result automatically resume you once; do not ask again, poll, or repeat the proposal." + APPLIES_OUTCOME,
+    description: "Chief of Staff only: submit all requested specialist creation, profile/model configuration, Chief assignments, and authorized team moves in ONE combined plan. Use exact catalog engine/model IDs from list_team_setup. Combine all fields for each bot; use the same create key or botId to coalesce repeated entries. Bulk edits: one update per bot, up to 40 bots (8 new). New teams must be named explicitly in newTeams and have a specialist in this plan; access is granted only to those new teams. Existing unauthorized teams cannot be included. Models change bot defaults for groups/new threads; existing threads and execution permissions stay unchanged. If review is pending, the decision and structured result automatically resume you once; do not ask again, poll, or repeat the proposal." + APPLIES_OUTCOME,
     inputSchema: {
       type: "object", additionalProperties: false,
       properties: {
         reason: { type: "string", minLength: 1, maxLength: 500 },
         newTeams: { type: "array", maxItems: 8, items: { type: "string", minLength: 1, maxLength: 60 } },
-        operations: { type: "array", minItems: 1, maxItems: 24, items: {
+        operations: { type: "array", minItems: 1, maxItems: 40, items: {
           type: "object", additionalProperties: false,
           properties: {
             action: { type: "string", enum: ["create", "update"] },
@@ -456,6 +459,7 @@ const TOOL_DEFINITIONS = [
               name: { type: "string", maxLength: 100 }, title: { type: "string", maxLength: 200 },
               chiefOfStaff: { type: "boolean", description: "Appoint or remove this team's Chief. At most one Chief per team: explicitly demote the current Chief in the same plan when replacing them. Does not grant access to other teams or change execution permissions." },
               description: { type: "string", maxLength: 4000 }, soul: { type: "string", description: "Standing instructions; required with name/title/modelSelection for every new bot." },
+              soulAppend: { type: "string", description: "Update only, instead of soul: text appended to its current instructions." },
               cwd: { type: "string", maxLength: 1024, description: "Create only: absolute path of the folder the new bot's tools read and write in. It must already exist. Leave it out for a private workspace." },
               section: { type: "string", maxLength: 60, description: "Exact authorized existing team, or a team explicitly named in newTeams. Empty string means General." },
               modelSelection: { type: "object", additionalProperties: false, properties: {
@@ -657,7 +661,7 @@ const TOOL_DEFINITIONS = [
       additionalProperties: false,
       properties: {
         action: { type: "string", enum: ["list", "events"] },
-        trigger_id: { type: "string", description: "list: one trigger's details and recent fires." },
+        trigger_id: { type: "string", description: "Full instructions and fires; edit redactions in Automations." },
         include_address: { type: "boolean", description: "list, with a webhook's trigger_id: also its private address. For the bot that owns it, or a Chief of Staff." },
         for_bot_id: { type: "string", description: "list: ANOTHER bot's triggers in your section, from list_bots." },
         app: { type: "string", description: "events: optional app slug, e.g. gmail." },
@@ -733,6 +737,7 @@ const TOOL_DEFINITIONS = [
           type: "boolean",
           description: "Speak this bot's replies aloud as they settle, without being asked.",
         },
+        browserProfile: { type: "string", maxLength: 100, description: "With for_bot_id, only when the person asked: an idle teammate's browser profile, an existing one's name or id; \"\" = its own browser." },
         reason: { type: "string", minLength: 1, maxLength: 500, description: "One sentence the user will see explaining why." },
         for_bot_id: {
           type: "string",
@@ -824,7 +829,7 @@ const TOOL_DEFINITIONS = [
           type: "array",
           maxItems: 8,
           description:
-            "Optional detail files (32KB each) for when SKILL.md would pass 32KB: keep the core steps in SKILL.md, move long rules or examples here, and link each from SKILL.md. On update, omitted references stay; empty content removes one.",
+            "Optional detail files (32KB each) for when SKILL.md would pass 64KB: keep the core steps in SKILL.md, move long rules or examples here, and link each from SKILL.md. On update, omitted references stay; empty content removes one.",
           items: {
             type: "object",
             additionalProperties: false,
@@ -922,6 +927,7 @@ const TOOL_DEFINITIONS = [
       required: ["action"],
     },
   },
+  APP_SETTINGS_TOOL_DEFINITION,
 ].map((tool) => {
   const annotations = agentToolAnnotations(tool.name);
   return annotations ? { ...tool, annotations } : tool;
@@ -935,18 +941,19 @@ const CHIEF_ONLY_TOOL_NAMES = new Set([
   "create_bot", "list_team_setup", "list_team_library", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread",
 ]);
 const CHIEF_TARGET_TOOL_NAMES = new Set(["propose_profile", "propose_model", "reset_cloud_computer"]);
+const CHIEF_TARGET_FIELDS = new Set(["for_bot_id", "browserProfile"]);
 const WATCHER_TOOL_NAMES = new Set(["create_options_card"]);
 
 const LOCAL_VM_TOOL_NAMES = new Set(["vm_exec"]);
 /** Refused in a room's thread (routes/waits.ts), and list_waits, since a room holds no wait. */
-const ROOM_REFUSED_TOOL_NAMES = new Set([...WAIT_TOOL_NAMES, "burst"]);
+const ROOM_REFUSED_TOOL_NAMES = new Set([...WAIT_TOOL_NAMES, "burst", "rename_thread"]);
 const CLOUD_HOME_SURFACE = {
   type: "string", enum: ["auto", "cloud", "browser"],
   description: "auto = suitable configured computer, cloud = the bot's cloud computer, browser = built-in browser. Omit to list. This server runs in the cloud: the user's own computer and a Local VM are not places here.",
 };
 
 export function availableTools(profile: CatalogProfile) {
-  const tools = catalogTools(profile);
+  const tools = withoutToolsOff(catalogTools(profile), profile.toolsOff ?? []);
   const placed = profile.cloudHome
     ? tools.filter(tool => !LOCAL_VM_TOOL_NAMES.has(tool.name)).map(tool => tool.name === "select_computer"
       ? { ...tool, inputSchema: { ...tool.inputSchema, properties: { surface: CLOUD_HOME_SURFACE } } }
@@ -986,7 +993,7 @@ function catalogTools(profile: CatalogProfile) {
     ? RESEARCH_READY_TOOLS
     : RESEARCH_READY_TOOLS.filter((tool) => !CHIEF_ONLY_TOOL_NAMES.has(tool.name)).map((tool) => {
       if (!CHIEF_TARGET_TOOL_NAMES.has(tool.name)) return tool;
-      const properties = Object.fromEntries(Object.entries(tool.inputSchema.properties).filter(([key]) => key !== "for_bot_id"));
+      const properties = Object.fromEntries(Object.entries(tool.inputSchema.properties).filter(([key]) => !CHIEF_TARGET_FIELDS.has(key)));
       return { ...tool, description: tool.description.replace(CHIEF_PROFILE_TARGET, ""), inputSchema: { ...tool.inputSchema, properties } };
     });
   return [...ROLE_TOOLS, ...(profile.mausbot === true ? MAUSBOT_TOOL_DEFINITIONS : [])];

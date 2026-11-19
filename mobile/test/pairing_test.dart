@@ -1,9 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:mobile/core/e2e/descriptor.dart';
+import 'package:mobile/core/network/sse_client.dart';
 import 'package:mobile/core/storage/pairing_storage.dart';
 import 'package:mobile/features/pairing/pairing_model.dart';
 import 'package:mobile/features/pairing/pairing_view.dart';
@@ -61,6 +66,22 @@ void main() {
       expect(payload.endpoints.first.kind, 'hosted');
       expect(payload.dialUrl, 'https://c-abc.openmausbot.com');
     });
+
+    test('PairingPayload extracts e2e query parameter from openmausbot://pair URI', () {
+      final desc = E2EDescriptor.parseJson({
+        'v': 1,
+        'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+        'h': 'lz81isB3BuNV6rHgYgG3Wg',
+        'r': ['relay.example.com'],
+      });
+      final rawUri =
+          'openmausbot://pair?address=192.168.1.80:8810&token=omb_pair_secret789&name=HomeServer&e2e=${desc.toB64u()}';
+      final payload = PairingPayload.fromJsonString(rawUri);
+      expect(payload.e2e, isNotNull);
+      expect(payload.e2e!.k, desc.k);
+      expect(payload.e2e!.h, desc.h);
+      expect(payload.e2e!.relayNodes, ['relay.example.com']);
+    });
   });
 
   group('PairingStorage', () {
@@ -90,6 +111,56 @@ void main() {
       expect(await storage.getLanUrl(), isNull);
       expect(await storage.getRemoteUrl(), isNull);
       expect(await storage.getEndpoints(), isEmpty);
+    });
+
+    test('PairingStorage stores and retrieves pinned transport key k, h, and r', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+      final storage = PairingStorage();
+      await storage.saveE2EIdentity(
+        transportPublicKey: 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+        hostId: 'lz81isB3BuNV6rHgYgG3Wg',
+        relayNodes: ['relay1.example.com', 'relay2.example.com'],
+      );
+
+      final identity = await storage.getE2EIdentity();
+      expect(identity, isNotNull);
+      expect(identity!.k, 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0');
+      expect(identity.h, 'lz81isB3BuNV6rHgYgG3Wg');
+      expect(identity.r, ['relay1.example.com', 'relay2.example.com']);
+
+      await storage.clearE2EIdentity();
+      expect(await storage.getE2EIdentity(), isNull);
+    });
+  });
+
+  group('SseNetworkClient E2E fail-closed', () {
+    test('SseNetworkClient refuses plain HTTP requests when an E2E pairing exists (fail-closed invariant)', () async {
+      var plainHttpCalled = false;
+      final mockHttp = MockClient((request) async {
+        plainHttpCalled = true;
+        return http.Response('{"app":"openmausbot"}', 200);
+      });
+
+      final desc = E2EDescriptor.parseJson({
+        'v': 1,
+        'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+        'h': 'lz81isB3BuNV6rHgYgG3Wg',
+        'r': ['relay.example.com'],
+      });
+
+      final sseClient = SseNetworkClient(
+        deviceToken: 'omb_test_tok',
+        lanUrl: 'http://192.168.1.50:8810',
+        e2e: desc,
+        httpClient: mockHttp,
+        connector: (uri, {protocols}) async {
+          throw const SocketException('Relay connection failed');
+        },
+      );
+
+      expect(sseClient.isE2E, isTrue);
+      expect(() => sseClient.resolveActiveBaseUrl(), throwsA(isA<Exception>()));
+      expect(plainHttpCalled, isFalse);
     });
   });
 

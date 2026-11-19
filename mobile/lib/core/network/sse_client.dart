@@ -3,6 +3,9 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../e2e/descriptor.dart';
+import '../e2e/relay_client.dart';
+import '../e2e/stream_transport.dart';
 import '../../features/pairing/pairing_model.dart';
 
 class CompanionEvent {
@@ -17,7 +20,10 @@ class CompanionEvent {
 class SseNetworkClient {
   final List<CompanionEndpoint> endpoints;
   final String deviceToken;
+  final E2EDescriptor? e2e;
   final http.Client _client;
+  PhoneRelayClient? _relayClient;
+  final WebSocketConnector? _connector;
 
   SseNetworkClient({
     List<CompanionEndpoint>? endpoints,
@@ -25,12 +31,19 @@ class SseNetworkClient {
     String? remoteUrl,
     required this.deviceToken,
     http.Client? httpClient,
+    this.e2e,
+    PhoneRelayClient? relayClient,
+    WebSocketConnector? connector,
   })  : endpoints = _normalizeEndpoints(
           endpoints: endpoints,
           lanUrl: lanUrl,
           remoteUrl: remoteUrl,
         ),
-        _client = httpClient ?? http.Client();
+        _client = httpClient ?? http.Client(),
+        _relayClient = relayClient,
+        _connector = connector;
+
+  bool get isE2E => e2e != null;
 
   /// Back-compat for tests that still read these fields.
   String get lanUrl {
@@ -90,8 +103,31 @@ class SseNetworkClient {
     return trimmed;
   }
 
-  /// Prefer LAN/Bonjour when healthy, then hosted, then tailnet.
+  Future<http.Client> _getActiveClient() async {
+    if (e2e != null) {
+      _relayClient ??= PhoneRelayClient(
+        descriptor: e2e!,
+        credentialToken: deviceToken,
+        connector: _connector ?? defaultWebSocketConnector,
+      );
+      if (!_relayClient!.isConnected) {
+        await _relayClient!.connect();
+      }
+      return _relayClient!.httpClient;
+    }
+    return _client;
+  }
+
   Future<String> resolveActiveBaseUrl() async {
+    if (e2e != null) {
+      final client = await _getActiveClient();
+      final healthy = await _isHealthy('http://$relayHost', client);
+      if (healthy) {
+        return 'http://$relayHost';
+      }
+      return 'http://$relayHost';
+    }
+
     final local = endpoints.where((endpoint) => endpoint.isLocal).toList();
     final hosted = endpoints.where((endpoint) => endpoint.kind == 'hosted').toList();
     final tailnet = endpoints.where((endpoint) => endpoint.kind == 'tailnet').toList();
@@ -117,9 +153,10 @@ class SseNetworkClient {
 
   Future<String> resolveActiveEndpoint() => resolveActiveBaseUrl();
 
-  Future<bool> _isHealthy(String baseUrl) async {
+  Future<bool> _isHealthy(String baseUrl, [http.Client? client]) async {
+    final httpClient = client ?? _client;
     try {
-      final res = await _client
+      final res = await httpClient
           .get(
             Uri.parse('$baseUrl/api/health'),
             headers: {'Authorization': 'Bearer $deviceToken'},
@@ -134,13 +171,70 @@ class SseNetworkClient {
   }
 
   static Future<PairResult> redeemPair({
-    required String baseUrl,
+    String? baseUrl,
     required String deviceName,
     String? credential,
     String? code,
     String? pairRequestId,
     http.Client? httpClient,
+    E2EDescriptor? e2e,
+    PhoneRelayClient? relayClient,
+    WebSocketConnector? connector,
   }) async {
+    if (e2e != null) {
+      if (credential == null || credential.isEmpty) {
+        throw ArgumentError('E2E pairing requires a pairing credential');
+      }
+      final relay = relayClient ??
+          PhoneRelayClient(
+            descriptor: e2e,
+            credentialToken: credential,
+            connector: connector ?? defaultWebSocketConnector,
+          );
+      await relay.connect();
+      final client = relay.httpClient;
+      try {
+        final body = <String, dynamic>{
+          'deviceName': deviceName,
+          'credential': credential,
+          if (code != null && code.isNotEmpty) 'code': code,
+          if (pairRequestId != null) 'pairRequestId': pairRequestId,
+        };
+        final res = await client.post(
+          Uri.parse('http://$relayHost/api/pair'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        );
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          String error = 'pairing failed (${res.statusCode})';
+          try {
+            final parsed = jsonDecode(res.body);
+            if (parsed is Map && parsed['error'] is String) {
+              error = parsed['error'] as String;
+            }
+          } catch (_) {}
+          throw Exception(error);
+        }
+        final parsedJson = jsonDecode(res.body) as Map<String, dynamic>;
+        final pairResult = PairResult.fromJson(parsedJson);
+        return PairResult(
+          token: pairResult.token,
+          serverName: pairResult.serverName,
+          deviceId: pairResult.deviceId,
+          endpoints: pairResult.endpoints,
+          e2e: pairResult.e2e ?? e2e,
+        );
+      } finally {
+        if (relayClient == null) {
+          await relay.close();
+        }
+      }
+    }
+
+    if (baseUrl == null || baseUrl.isEmpty) {
+      throw Exception('pairing invite has no reachable host');
+    }
+
     final client = httpClient ?? http.Client();
     final shouldClose = httpClient == null;
     try {
@@ -155,7 +249,7 @@ class SseNetworkClient {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
-      if (res.statusCode != 201) {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
         String error = 'pairing failed (${res.statusCode})';
         try {
           final parsed = jsonDecode(res.body);
@@ -172,6 +266,7 @@ class SseNetworkClient {
   }
 
   Stream<CompanionEvent> streamEvents({String? lastEventId}) async* {
+    final client = await _getActiveClient();
     final baseUrl = await resolveActiveBaseUrl();
     final uri = Uri.parse('$baseUrl/api/events');
     final request = http.Request('GET', uri);
@@ -182,7 +277,7 @@ class SseNetworkClient {
       request.headers['Last-Event-ID'] = lastEventId;
     }
 
-    final response = await _client.send(request);
+    final response = await client.send(request);
     if (response.statusCode != 200) {
       throw Exception('Failed to connect to SSE stream: ${response.statusCode}');
     }
@@ -290,9 +385,10 @@ class SseNetworkClient {
     required String answered,
   }) async {
     try {
+      final client = await _getActiveClient();
       final baseUrl = await resolveActiveBaseUrl();
       final uri = Uri.parse('$baseUrl/api/bots/$botId/cards/$messageId');
-      final res = await _client.patch(
+      final res = await client.patch(
         uri,
         headers: {
           'Authorization': 'Bearer $deviceToken',
@@ -310,9 +406,10 @@ class SseNetworkClient {
   }
 
   Future<dynamic> getJson(String path) async {
+    final client = await _getActiveClient();
     final baseUrl = await resolveActiveBaseUrl();
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    final res = await _client.get(
+    final res = await client.get(
       Uri.parse('$baseUrl$normalizedPath'),
       headers: {'Authorization': 'Bearer $deviceToken'},
     );
@@ -324,11 +421,12 @@ class SseNetworkClient {
 
   Future<bool> postJson(String path, Map<String, dynamic> body) async {
     try {
+      final client = await _getActiveClient();
       final baseUrl = await resolveActiveBaseUrl();
       final normalizedPath = path.startsWith('/') ? path : '/$path';
       final uri = Uri.parse('$baseUrl$normalizedPath');
 
-      final res = await _client.post(
+      final res = await client.post(
         uri,
         headers: {
           'Authorization': 'Bearer $deviceToken',
@@ -343,5 +441,19 @@ class SseNetworkClient {
     }
   }
 
-  void close() => _client.close();
+  Future<Map<String, dynamic>?> getEndpointsInfo() async {
+    try {
+      final data = await getJson('/api/companion/endpoints');
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void close() {
+    _client.close();
+    _relayClient?.close();
+  }
 }

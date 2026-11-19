@@ -165,10 +165,7 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
       }
       else if (arg === "--tunnel" || arg === "--relay") options[arg === "--tunnel" ? "tunnel" : "relay"] = true;
       else if (arg === "--relay-self-hosted") options.relaySelfHosted = true;
-      else if (arg === "--relay-node") {
-        options.relaySelfHosted = true;
-        options.relayNodes = [...(options.relayNodes ?? []), value()];
-      }
+      else if (arg === "--relay-node") { options.relaySelfHosted = true; options.relayNodes = [...(options.relayNodes ?? []), value()]; }
       else if (arg === "--client" || (options.command === "pair" && arg === "--chat-only")) options.client = true;
       // Which phone will scan; only Android needs a different QR. `pair --phone` alone is a chat-only code for any phone.
       else if (arg === "--phone") {
@@ -723,8 +720,7 @@ export async function runServe(options: CliOptions, log: (line: string) => void 
     OMB_DATA_DIR: options.dataDir,
     OMB_PORT: String(options.port),
     OMB_WEBHOOK_PORT: process.env.OMB_WEBHOOK_PORT || String(options.port + 1), ...(options.relay ? { OMB_PHONE_RELAY: "1" } : {}),
-    ...(options.relaySelfHosted ? { OMB_PHONE_RELAY_SELF_HOSTED: "1" } : {}),
-    ...(options.relayNodes?.length ? { OMB_PHONE_RELAY_NODES: options.relayNodes.join(",") } : {}),
+    ...(options.relaySelfHosted ? { OMB_PHONE_RELAY_SELF_HOSTED: "1" } : {}), ...(options.relayNodes?.length ? { OMB_PHONE_RELAY_NODES: options.relayNodes.join(",") } : {}),
   };
   if (options.local) delete env.OMB_PUBLIC_URL;
   // The per-launch secret goes over stdin, not the environment that every engine the server starts inherits.
@@ -1031,25 +1027,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         return 0;
       }
       return runFleetCommand({
-        action: options.fleetAction as FleetInput["action"],
-        slug: options.slug,
-        domain: options.domain,
-        operator: options.operator ?? process.env.SUDO_USER,
-        admins: options.admins ?? [],
-        members: options.members ?? [],
-        brandFile: options.brandFile,
-        anthropicKeyFile: options.anthropicKeyFile,
-        cap: options.cap,
-        licenseKey: options.licenseKey ?? process.env.OMB_LICENSE_KEY,
-        memory: options.memory,
-        dryRun: options.dryRun ?? false,
-        yes: options.yes ?? false,
-        keepData: options.keepData ?? false,
-        userAction: options.fleetUserAction,
-        email: options.email,
-        chatOnly: options.chatOnly,
-        node: process.execPath,
-        script: process.argv[1] ?? "",
+        action: options.fleetAction as FleetInput["action"], slug: options.slug, domain: options.domain, operator: options.operator ?? process.env.SUDO_USER,
+        admins: options.admins ?? [], members: options.members ?? [], brandFile: options.brandFile, anthropicKeyFile: options.anthropicKeyFile,
+        cap: options.cap, licenseKey: options.licenseKey ?? process.env.OMB_LICENSE_KEY, memory: options.memory, dryRun: options.dryRun ?? false,
+        yes: options.yes ?? false, keepData: options.keepData ?? false, userAction: options.fleetUserAction, email: options.email,
+        chatOnly: options.chatOnly, node: process.execPath, script: process.argv[1] ?? "",
       }, { log: (line) => console.log(line), error: (line) => console.error(line) });
     case "logout":
       return runLogout(options);
@@ -1059,11 +1041,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     case "browser":
       return runBrowser(options);
     case "relay-token-keys":
-    case "relay-keys": {
-      const { printRelayTokenKeys } = await import("./phone-relay.ts");
-      console.log(printRelayTokenKeys(options.dataDir));
+    case "relay-keys":
+      console.log((await import("./phone-relay.ts")).printRelayTokenKeys(options.dataDir));
       return 0;
-    }
     default:
       console.log(usage(cliPrefix()));
       return 0;

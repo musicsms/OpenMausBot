@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "vitest";
@@ -116,17 +116,34 @@ describe("self-hosted relay automated interop", () => {
       assert.ok(mintBody.inviteUrl);
       assert.ok(mintBody.inviteUrl.includes("e2e="));
 
+      const userHome = userInfo().homedir;
+      const flutterBin =
+        process.env.FLUTTER_BIN ??
+        (userHome && existsSync(join(userHome, "flutter", "bin"))
+          ? join(userHome, "flutter", "bin")
+          : process.env.HOME && existsSync(join(process.env.HOME, "flutter", "bin"))
+            ? join(process.env.HOME, "flutter", "bin")
+            : "");
+      const pathEnv = flutterBin ? `${flutterBin}:${process.env.PATH}` : process.env.PATH;
+      const flutterExecutable = flutterBin ? join(flutterBin, "flutter") : "flutter";
+
       let dartStdout = "";
       let dartStderr = "";
-      dartChild = spawn("flutter", ["test", "test/e2e/interop_runner_test.dart"], {
+      let dartSpawnError: Error | undefined;
+      dartChild = spawn(flutterExecutable, ["test", "test/e2e/interop_runner_test.dart"], {
         cwd: join(ROOT, "mobile"),
         env: {
           ...process.env,
-          PATH: `/home/ubuntu/flutter/bin:${process.env.PATH}`,
+          ...(userHome ? { HOME: userHome } : {}),
+          PATH: pathEnv,
           PAIRING_URI: mintBody.inviteUrl,
           OMB_RELAY_URL: `ws://127.0.0.1:${relayPort}`,
           SYNC_DIR: syncDir,
         },
+      });
+
+      dartChild.on("error", (err) => {
+        dartSpawnError = err;
       });
 
       dartChild.stdout?.on("data", (chunk: Buffer) => {
@@ -138,7 +155,15 @@ describe("self-hosted relay automated interop", () => {
         process.stderr.write(chunk);
       });
 
-      await waitFor(() => existsSync(join(syncDir, "ready_for_revocation")), 30_000);
+      await waitFor(() => {
+        if (dartSpawnError) throw dartSpawnError;
+        if (dartChild?.exitCode !== null && dartChild?.exitCode !== undefined) {
+          throw new Error(
+            `Dart runner exited prematurely with code ${dartChild.exitCode}:\nSTDOUT:\n${dartStdout}\nSTDERR:\n${dartStderr}`,
+          );
+        }
+        return existsSync(join(syncDir, "ready_for_revocation"));
+      }, 30_000);
 
       const pairedInfo = JSON.parse(
         readFileSync(join(syncDir, "paired.json"), "utf8"),

@@ -123,6 +123,13 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 500));
 
+    var removedWaited = 0;
+    while (!sseClient.isDeviceRemoved && removedWaited < 3000) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      removedWaited += 50;
+    }
+    expect(sseClient.isDeviceRemoved, isTrue);
+
     final postRevokeClient = PhoneRelayClient(
       descriptor: storedDesc!,
       credentialToken: pairResult.token,

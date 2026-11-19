@@ -386,7 +386,7 @@ class YamuxHttpClient extends http.BaseClient {
           orElse: () => const MapEntry('', ''),
         )
         .value;
-    if (accept.toLowerCase() != 'text/event-stream') {
+    if (!accept.toLowerCase().startsWith('text/event-stream')) {
       stream.finish();
     }
     return parseHttpResponse(stream, request: request);

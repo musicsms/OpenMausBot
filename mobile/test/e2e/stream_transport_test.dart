@@ -175,7 +175,7 @@ void main() {
               const reply =
                   'HTTP/1.1 200 OK\r\n'
                   'Content-Type: application/json\r\n'
-                  'Content-Length: 23\r\n'
+                  'Content-Length: 21\r\n'
                   '\r\n'
                   '{"app":"openmausbot"}';
               stream.add(utf8.encode(reply));
@@ -240,6 +240,77 @@ void main() {
       final response = await client.send(postReq);
       expect(response.statusCode, equals(201));
       expect(await response.stream.bytesToString(), equals('{"token":"omb_1"}'));
+    });
+
+    test('parseHttpResponse reports premature closure when Content-Length is truncated', () async {
+      final controller = StreamController<List<int>>();
+      final responseFuture = parseHttpResponse(controller.stream);
+
+      controller.add(utf8.encode(
+        'HTTP/1.1 200 OK\r\n'
+        'Content-Type: text/plain\r\n'
+        'Content-Length: 100\r\n'
+        '\r\n'
+        'short body',
+      ));
+      final response = await responseFuture;
+      expect(response.statusCode, equals(200));
+
+      await controller.close();
+      expect(
+        () async => await response.stream.toBytes(),
+        throwsA(isA<http.ClientException>().having((e) => e.message, 'message', contains('prematurely'))),
+      );
+    });
+
+    test('parseHttpResponse reports premature closure when chunked stream terminates before end chunk', () async {
+      final controller = StreamController<List<int>>();
+      final responseFuture = parseHttpResponse(controller.stream);
+
+      controller.add(utf8.encode(
+        'HTTP/1.1 200 OK\r\n'
+        'Transfer-Encoding: chunked\r\n'
+        '\r\n'
+        '5\r\n'
+        'hello\r\n',
+      ));
+      final response = await responseFuture;
+      expect(response.statusCode, equals(200));
+
+      await controller.close();
+      expect(
+        () async => await response.stream.toBytes(),
+        throwsA(isA<http.ClientException>().having((e) => e.message, 'message', contains('prematurely'))),
+      );
+    });
+
+    test('parseHttpResponse cancels subscription and rejects completer on malformed status line', () async {
+      var cancelled = false;
+      final controller = StreamController<List<int>>(
+        onCancel: () => cancelled = true,
+      );
+
+      final responseFuture = parseHttpResponse(controller.stream);
+      controller.add(utf8.encode('NOT_HTTP_DATA\r\n\r\n'));
+
+      expect(
+        () async => await responseFuture,
+        throwsA(isA<FormatException>()),
+      );
+      await pumpEventQueue();
+      expect(cancelled, isTrue);
+    });
+
+    test('YamuxHttpClient.send does not open stream if request finalization fails', () async {
+      final session = YamuxSession(role: YamuxRole.phone);
+      final client = YamuxHttpClient(session);
+
+      final failingStream = Stream<List<int>>.error(Exception('read failure'));
+      final req = http.StreamedRequest('POST', Uri.parse('http://phone-relay.invalid/test'));
+      failingStream.listen(req.sink.add, onError: req.sink.addError, onDone: req.sink.close);
+
+      expect(() async => await client.send(req), throwsA(isA<Exception>()));
+      expect(session.activeStreams, equals(0));
     });
   });
 }

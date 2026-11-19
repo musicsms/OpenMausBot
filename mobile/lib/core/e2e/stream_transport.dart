@@ -124,6 +124,17 @@ Future<http.StreamedResponse> parseHttpResponse(
     },
   );
 
+  void fail(Object error, [StackTrace? stackTrace]) {
+    subscription.cancel();
+    if (!completer.isCompleted) {
+      completer.completeError(error, stackTrace);
+    }
+    if (!bodyController.isClosed) {
+      bodyController.addError(error, stackTrace);
+      bodyController.close();
+    }
+  }
+
   final buffer = _ByteAccumulator();
   var headersParsed = false;
   var isChunked = false;
@@ -231,111 +242,109 @@ Future<http.StreamedResponse> parseHttpResponse(
 
   subscription = byteStream.listen(
     (data) {
-      if (byteStream is YamuxStream) {
-        byteStream.consumed(data.length);
-      }
-      buffer.add(data);
-
-      if (!headersParsed) {
-        var headerEnd = buffer.indexOfSequence(const [13, 10, 13, 10]);
-        var delimiterLength = 4;
-        if (headerEnd == -1) {
-          headerEnd = buffer.indexOfSequence(const [10, 10]);
-          delimiterLength = 2;
+      try {
+        if (byteStream is YamuxStream) {
+          byteStream.consumed(data.length);
         }
-        if (headerEnd == -1) return;
+        buffer.add(data);
 
-        final headerBytes = buffer.take(headerEnd);
-        buffer.take(delimiterLength);
+        if (!headersParsed) {
+          var headerEnd = buffer.indexOfSequence(const [13, 10, 13, 10]);
+          var delimiterLength = 4;
+          if (headerEnd == -1) {
+            headerEnd = buffer.indexOfSequence(const [10, 10]);
+            delimiterLength = 2;
+          }
+          if (headerEnd == -1) return;
 
-        final headerText = utf8.decode(headerBytes);
-        final lines = headerText.split(RegExp(r'\r?\n'));
-        if (lines.isEmpty || lines[0].trim().isEmpty) {
-          completer.completeError(const FormatException('Empty HTTP response'));
-          return;
-        }
+          final headerBytes = buffer.take(headerEnd);
+          buffer.take(delimiterLength);
 
-        final statusLine = lines[0].trim();
-        final firstSpace = statusLine.indexOf(' ');
-        if (firstSpace == -1) {
-          completer.completeError(FormatException('Invalid HTTP status line: $statusLine'));
-          return;
-        }
-        final secondSpace = statusLine.indexOf(' ', firstSpace + 1);
-        final int statusCode;
-        final String? reasonPhrase;
-        if (secondSpace == -1) {
-          statusCode = int.parse(statusLine.substring(firstSpace + 1));
-          reasonPhrase = null;
-        } else {
-          statusCode = int.parse(statusLine.substring(firstSpace + 1, secondSpace));
-          reasonPhrase = statusLine.substring(secondSpace + 1);
-        }
+          final headerText = utf8.decode(headerBytes);
+          final lines = headerText.split(RegExp(r'\r?\n'));
+          if (lines.isEmpty || lines[0].trim().isEmpty) {
+            fail(const FormatException('Empty HTTP response'));
+            return;
+          }
 
-        final headers = <String, String>{};
-        for (var i = 1; i < lines.length; i++) {
-          final line = lines[i].trim();
-          if (line.isEmpty) continue;
-          final colon = line.indexOf(':');
-          if (colon == -1) continue;
-          final key = line.substring(0, colon).trim().toLowerCase();
-          final value = line.substring(colon + 1).trim();
-          if (headers.containsKey(key)) {
-            headers[key] = '${headers[key]}, $value';
+          final statusLine = lines[0].trim();
+          final firstSpace = statusLine.indexOf(' ');
+          if (firstSpace == -1) {
+            fail(FormatException('Invalid HTTP status line: $statusLine'));
+            return;
+          }
+          final secondSpace = statusLine.indexOf(' ', firstSpace + 1);
+          final int statusCode;
+          final String? reasonPhrase;
+          if (secondSpace == -1) {
+            statusCode = int.parse(statusLine.substring(firstSpace + 1));
+            reasonPhrase = null;
           } else {
-            headers[key] = value;
+            statusCode = int.parse(statusLine.substring(firstSpace + 1, secondSpace));
+            reasonPhrase = statusLine.substring(secondSpace + 1);
           }
-        }
 
-        final isHead = request?.method.toUpperCase() == 'HEAD';
-        final isNoBodyStatus = (statusCode >= 100 && statusCode < 200) || statusCode == 204 || statusCode == 304;
+          final headers = <String, String>{};
+          for (var i = 1; i < lines.length; i++) {
+            final line = lines[i].trim();
+            if (line.isEmpty) continue;
+            final colon = line.indexOf(':');
+            if (colon == -1) continue;
+            final key = line.substring(0, colon).trim().toLowerCase();
+            final value = line.substring(colon + 1).trim();
+            if (headers.containsKey(key)) {
+              headers[key] = '${headers[key]}, $value';
+            } else {
+              headers[key] = value;
+            }
+          }
 
-        int? parsedContentLength;
-        if (headers.containsKey('content-length')) {
-          parsedContentLength = int.tryParse(headers['content-length']!);
-        }
+          final isHead = request?.method.toUpperCase() == 'HEAD';
+          final isNoBodyStatus = (statusCode >= 100 && statusCode < 200) || statusCode == 204 || statusCode == 304;
 
-        final transferEncoding = headers['transfer-encoding']?.toLowerCase() ?? '';
-        isChunked = transferEncoding.contains('chunked');
+          int? parsedContentLength;
+          if (headers.containsKey('content-length')) {
+            parsedContentLength = int.tryParse(headers['content-length']!);
+          }
 
-        if (isHead || isNoBodyStatus) {
-          bodyRemaining = 0;
-          if (!bodyController.isClosed) bodyController.close();
-        } else if (isChunked) {
-          bodyRemaining = -1;
-        } else if (parsedContentLength != null) {
-          bodyRemaining = parsedContentLength;
-          if (bodyRemaining == 0) {
+          final transferEncoding = headers['transfer-encoding']?.toLowerCase() ?? '';
+          isChunked = transferEncoding.contains('chunked');
+
+          if (isHead || isNoBodyStatus) {
+            bodyRemaining = 0;
             if (!bodyController.isClosed) bodyController.close();
+          } else if (isChunked) {
+            bodyRemaining = -1;
+          } else if (parsedContentLength != null) {
+            bodyRemaining = parsedContentLength;
+            if (bodyRemaining == 0) {
+              if (!bodyController.isClosed) bodyController.close();
+            }
+          } else {
+            bodyRemaining = -1;
           }
+
+          headersParsed = true;
+
+          final streamedResponse = http.StreamedResponse(
+            bodyController.stream,
+            statusCode,
+            contentLength: parsedContentLength,
+            request: request,
+            headers: headers,
+            reasonPhrase: reasonPhrase,
+          );
+          completer.complete(streamedResponse);
+          processBody();
         } else {
-          bodyRemaining = -1;
+          processBody();
         }
-
-        headersParsed = true;
-
-        final streamedResponse = http.StreamedResponse(
-          bodyController.stream,
-          statusCode,
-          contentLength: parsedContentLength,
-          request: request,
-          headers: headers,
-          reasonPhrase: reasonPhrase,
-        );
-        completer.complete(streamedResponse);
-        processBody();
-      } else {
-        processBody();
+      } catch (error, stackTrace) {
+        fail(error, stackTrace);
       }
     },
     onError: (error, stackTrace) {
-      if (!completer.isCompleted) {
-        completer.completeError(error, stackTrace);
-      }
-      if (!bodyController.isClosed) {
-        bodyController.addError(error, stackTrace);
-        bodyController.close();
-      }
+      fail(error, stackTrace);
     },
     onDone: () {
       if (!headersParsed && !completer.isCompleted) {
@@ -344,6 +353,11 @@ Future<http.StreamedResponse> parseHttpResponse(
         );
       }
       if (!bodyController.isClosed) {
+        if (bodyRemaining > 0 || (isChunked && chunkState != _ChunkState.done)) {
+          bodyController.addError(
+            http.ClientException('Connection closed prematurely'),
+          );
+        }
         bodyController.close();
       }
     },
@@ -361,9 +375,9 @@ class YamuxHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    final stream = session.openStream();
     final bodyBytes = await request.finalize().toBytes();
     final serialized = serializeHttpRequest(request, bodyBytes);
+    final stream = session.openStream();
     stream.add(serialized);
     await stream.writable;
     stream.finish();

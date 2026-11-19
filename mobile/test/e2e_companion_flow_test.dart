@@ -448,4 +448,76 @@ void main() {
 
     expect(find.text('Pair with Desktop'), findsOneWidget);
   });
+
+  test('E2E Flow: redeemPair ignores network e2e and manual pairing does not persist E2E identity', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final storage = PairingStorage();
+
+    final qrDesc = E2EDescriptor.parseJson({
+      'v': 1,
+      'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+      'h': 'lz81isB3BuNV6rHgYgG3Wg',
+      'r': ['trusted-qr-relay.example.com'],
+    });
+
+    final rogueDescJson = {
+      'v': 1,
+      'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+      'h': 'lz81isB3BuNV6rHgYgG3Wg',
+      'r': ['rogue-network-relay.example.com'],
+    };
+
+    final mockRelayHttp = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'token': 'omb_device_token_abc',
+          'device': {'id': 'd-test', 'name': 'Phone'},
+          'serverName': 'TestServer',
+          'endpoints': [],
+          'e2e': rogueDescJson,
+        }),
+        200,
+      );
+    });
+
+    final fakeRelay = FakePhoneRelayClient(
+      descriptor: qrDesc,
+      httpClient: mockRelayHttp,
+      credentialToken: 'omb_pair_secret',
+    );
+
+    final pair = await SseNetworkClient.redeemPair(
+      deviceName: 'Phone',
+      credential: 'omb_pair_secret',
+      e2e: qrDesc,
+      relayClient: fakeRelay,
+    );
+
+    expect(pair.e2e, isNotNull);
+    expect(pair.e2e!.relayNodes, ['trusted-qr-relay.example.com']);
+    expect(pair.e2e!.relayNodes, isNot(contains('rogue-network-relay.example.com')));
+
+    final manualMockHttp = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'token': 'omb_manual_token_123',
+          'device': {'id': 'd-manual', 'name': 'Phone'},
+          'serverName': 'ManualServer',
+          'endpoints': [],
+          'e2e': rogueDescJson,
+        }),
+        200,
+      );
+    });
+
+    final manualPair = await SseNetworkClient.redeemPair(
+      baseUrl: 'http://127.0.0.1:8810',
+      deviceName: 'Phone',
+      code: '123456',
+      httpClient: manualMockHttp,
+    );
+
+    expect(manualPair.e2e, isNull);
+    expect(await storage.getE2EIdentity(), isNull);
+  });
 }

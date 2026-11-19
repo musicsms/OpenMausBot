@@ -82,6 +82,24 @@ void main() {
       expect(payload.e2e!.h, desc.h);
       expect(payload.e2e!.relayNodes, ['relay.example.com']);
     });
+
+    test('PairingPayload strictly rejects malformed e2e invites instead of falling back to plaintext', () {
+      const badB64Uri = 'openmausbot://pair?token=sec&e2e=not_valid_b64!';
+      expect(() => PairingPayload.fromJsonString(badB64Uri), throwsA(isA<FormatException>()));
+
+      const badKeyJson = '{"v":1,"k":"short"}';
+      final badKeyB64 = base64Url.encode(utf8.encode(badKeyJson)).replaceAll('=', '');
+      final badKeyUri = 'openmausbot://pair?token=sec&e2e=$badKeyB64';
+      expect(() => PairingPayload.fromJsonString(badKeyUri), throwsA(isA<FormatException>()));
+
+      const badHostJson = '{"v":1,"k":"BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0","h":"lz81isB3BuNV6rHgYgG3Wg","r":["bad_host!!"]}';
+      final badHostB64 = base64Url.encode(utf8.encode(badHostJson)).replaceAll('=', '');
+      final badHostUri = 'openmausbot://pair?token=sec&e2e=$badHostB64';
+      expect(() => PairingPayload.fromJsonString(badHostUri), throwsA(isA<FormatException>()));
+
+      const badJsonPayload = '{"host":"1.2.3.4","credential":"sec","e2e":"bad"}';
+      expect(() => PairingPayload.fromJsonString(badJsonPayload), throwsA(isA<FormatException>()));
+    });
   });
 
   group('PairingStorage', () {

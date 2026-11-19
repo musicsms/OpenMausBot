@@ -188,10 +188,13 @@ class _MausBotAppState extends State<MausBotApp> {
         e2e: payload.e2e,
       );
 
+      _sseClient?.close();
+      _sseClient = null;
+
       await _storage.clear();
 
       final endpoints = result.endpoints.isNotEmpty ? result.endpoints : payload.endpoints;
-      final e2eDesc = result.e2e ?? payload.e2e;
+      final e2eDesc = payload.e2e;
 
       final client = widget.sseClient ??
           SseNetworkClient(
@@ -245,6 +248,9 @@ class _MausBotAppState extends State<MausBotApp> {
         httpClient: widget.httpClient,
       );
 
+      _sseClient?.close();
+      _sseClient = null;
+
       await _storage.clear();
 
       final endpoints = result.endpoints.isNotEmpty
@@ -262,16 +268,7 @@ class _MausBotAppState extends State<MausBotApp> {
             endpoints: endpoints,
             deviceToken: result.token,
             httpClient: widget.httpClient,
-            e2e: result.e2e,
           );
-
-      if (result.e2e != null) {
-        await _storage.saveE2EIdentity(
-          transportPublicKey: result.e2e!.k,
-          hostId: result.e2e!.h,
-          relayNodes: result.e2e!.relayNodes,
-        );
-      }
 
       await _persistPairResult(
         result: result,

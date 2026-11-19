@@ -83,7 +83,7 @@ class PairingPayload {
         _endpointsFromLegacy(host: host, port: port, remoteUrl: remoteUrl);
     final e2eRaw = data['e2e'];
     final e2e = e2eRaw != null
-        ? E2EDescriptor.tryParse(e2eRaw is Map ? Map<String, dynamic>.from(e2eRaw) : e2eRaw)
+        ? E2EDescriptor.parse(e2eRaw is Map ? Map<String, dynamic>.from(e2eRaw) : e2eRaw)
         : null;
     return PairingPayload(
       host: host,
@@ -148,7 +148,7 @@ class PairingPayload {
 
     final e2eParam = uri.queryParameters['e2e'];
     final e2e = e2eParam != null && e2eParam.isNotEmpty
-        ? E2EDescriptor.tryParse(e2eParam)
+        ? E2EDescriptor.parse(e2eParam)
         : null;
 
     return PairingPayload(
@@ -301,21 +301,18 @@ class PairResult {
     this.e2e,
   });
 
-  factory PairResult.fromJson(Map<String, dynamic> json) {
+  factory PairResult.fromJson(Map<String, dynamic> json, [E2EDescriptor? e2e]) {
     final token = json['token'] as String?;
     if (token == null || token.isEmpty) {
       throw const FormatException('pair response missing token');
     }
     final device = json['device'];
-    final e2eRaw = json['e2e'];
     return PairResult(
       token: token,
       serverName: json['serverName'] as String? ?? 'OpenMausBot',
       deviceId: device is Map ? device['id'] as String? : null,
       endpoints: PairingPayload._endpointsFromJson(json['endpoints']) ?? const [],
-      e2e: e2eRaw != null
-          ? E2EDescriptor.tryParse(e2eRaw is Map ? Map<String, dynamic>.from(e2eRaw) : e2eRaw)
-          : null,
+      e2e: e2e,
     );
   }
 }

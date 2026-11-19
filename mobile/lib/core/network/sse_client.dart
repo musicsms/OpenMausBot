@@ -120,11 +120,7 @@ class SseNetworkClient {
 
   Future<String> resolveActiveBaseUrl() async {
     if (e2e != null) {
-      final client = await _getActiveClient();
-      final healthy = await _isHealthy('http://$relayHost', client);
-      if (healthy) {
-        return 'http://$relayHost';
-      }
+      await _getActiveClient();
       return 'http://$relayHost';
     }
 
@@ -216,14 +212,7 @@ class SseNetworkClient {
           throw Exception(error);
         }
         final parsedJson = jsonDecode(res.body) as Map<String, dynamic>;
-        final pairResult = PairResult.fromJson(parsedJson);
-        return PairResult(
-          token: pairResult.token,
-          serverName: pairResult.serverName,
-          deviceId: pairResult.deviceId,
-          endpoints: pairResult.endpoints,
-          e2e: pairResult.e2e ?? e2e,
-        );
+        return PairResult.fromJson(parsedJson, e2e);
       } finally {
         if (relayClient == null) {
           await relay.close();

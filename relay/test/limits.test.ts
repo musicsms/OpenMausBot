@@ -3,6 +3,14 @@ import { describe, test } from "node:test";
 import { addressKey, clientKey, IpLimiter, TokenBucket } from "../src/limits.ts";
 
 describe("clientKey", () => {
+  test("trusts Cf-Connecting-IP only from trusted proxy", () => {
+    assert.equal(clientKey("127.0.0.1", undefined, "198.51.100.1"), "198.51.100.1");
+    assert.equal(clientKey("::ffff:127.0.0.1", undefined, "2001:db8::1"), "2001:0db8:0000:0000::/64");
+    assert.equal(clientKey("198.51.100.2", undefined, "198.51.100.1"), "198.51.100.2");
+    assert.equal(clientKey("127.0.0.1", undefined, ["198.51.100.1"]), "198.51.100.1");
+    assert.equal(clientKey("127.0.0.1", "198.51.100.2", "198.51.100.1"), "198.51.100.1");
+  });
+
   test("trusts X-Forwarded-For only from 127.0.0.1, and only its last entry", () => {
     assert.equal(clientKey("203.0.113.9", "198.51.100.1"), "203.0.113.9");
     assert.equal(clientKey("::1", "198.51.100.1"), "0000:0000:0000:0000::/64");

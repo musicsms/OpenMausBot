@@ -133,7 +133,7 @@ export async function startRelay(config: RelayConfig, options: RelayOptions = {}
       metrics.inc("relay_refused_total", "subprotocol");
       return refuse(socket, 400, "Bad Request");
     }
-    const key = clientKey(req.socket.remoteAddress, req.headers["x-forwarded-for"]);
+    const key = clientKey(req.socket.remoteAddress, req.headers["x-forwarded-for"], req.headers["cf-connecting-ip"]);
     if (!key) {
       metrics.inc("relay_refused_total", "forwarded_for");
       return refuse(socket, 400, "Bad Request");

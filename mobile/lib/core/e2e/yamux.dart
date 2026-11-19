@@ -111,7 +111,7 @@ class YamuxFrame {
         type: YamuxType.ping,
         flags: flags,
         streamId: 0,
-        length: value,
+        length: value & 0xFFFFFFFF,
       );
 
   factory YamuxFrame.goAway([int code = YamuxGoAway.normal]) => YamuxFrame(
@@ -241,6 +241,7 @@ class YamuxStream extends Stream<Uint8List> implements Sink<List<int>> {
   final int streamId;
   final StreamController<Uint8List> _controller = StreamController<Uint8List>();
   final List<void Function()> _writableWaiters = [];
+  Uint8List? _pendingWrite;
 
   bool _established;
   int _receiveWindow;
@@ -271,6 +272,23 @@ class YamuxStream extends Stream<Uint8List> implements Sink<List<int>> {
   Stream<Uint8List> get stream => _controller.stream;
   Sink<List<int>> get sink => this;
 
+  Future<void> get writable {
+    if (isClosed || (sendWindow > 0 && (_pendingWrite == null || _pendingWrite!.isEmpty))) {
+      return Future<void>.value();
+    }
+    final completer = Completer<void>();
+    _writableWaiters.add(() {
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    });
+    return completer.future;
+  }
+
+  void onWritable(void Function() callback) {
+    _writableWaiters.add(callback);
+  }
+
   @override
   StreamSubscription<Uint8List> listen(
     void Function(Uint8List event)? onData, {
@@ -290,11 +308,30 @@ class YamuxStream extends Stream<Uint8List> implements Sink<List<int>> {
 
   @override
   void add(List<int> data) {
-    final bytes = data is Uint8List ? data : Uint8List.fromList(data);
-    write(bytes);
+    if (isClosed) return;
+    _flushPending();
+    var bytes = data is Uint8List ? data : Uint8List.fromList(data);
+    while (bytes.isNotEmpty) {
+      if (_pendingWrite != null && _pendingWrite!.isNotEmpty) {
+        final merged = Uint8List(_pendingWrite!.length + bytes.length)
+          ..setRange(0, _pendingWrite!.length, _pendingWrite!)
+          ..setRange(_pendingWrite!.length, _pendingWrite!.length + bytes.length, bytes);
+        _pendingWrite = merged;
+        return;
+      }
+      final taken = write(bytes);
+      if (taken == 0) {
+        _pendingWrite = bytes;
+        return;
+      }
+      bytes = Uint8List.sublistView(bytes, taken);
+    }
   }
 
-  void finish() => session.finish(streamId);
+  void finish() {
+    _flushPending();
+    session.finish(streamId);
+  }
 
   @override
   void close() => finish();
@@ -317,6 +354,7 @@ class YamuxStream extends Stream<Uint8List> implements Sink<List<int>> {
 
   void _markReset() {
     _isReset = true;
+    _pendingWrite = null;
     if (!_controller.isClosed) {
       _controller.addError(YamuxError('stream_reset'));
       _controller.close();
@@ -325,7 +363,20 @@ class YamuxStream extends Stream<Uint8List> implements Sink<List<int>> {
   }
 
   void _onWritable() {
+    _flushPending();
     _notifyWritable();
+  }
+
+  void _flushPending() {
+    while (_pendingWrite != null && _pendingWrite!.isNotEmpty) {
+      final taken = session.write(streamId, _pendingWrite!);
+      if (taken == 0) return;
+      if (taken == _pendingWrite!.length) {
+        _pendingWrite = null;
+      } else {
+        _pendingWrite = Uint8List.sublistView(_pendingWrite!, taken);
+      }
+    }
   }
 
   void _notifyWritable() {

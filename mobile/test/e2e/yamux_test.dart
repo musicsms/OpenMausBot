@@ -389,5 +389,100 @@ void main() {
       expect(chunks.length, equals(1));
       expect(chunks[0], equals(Uint8List.fromList([10, 20, 30])));
     });
+
+    test('YamuxStream.add slices payloads larger than 65507 bytes without truncation', () async {
+      late final YamuxSession phone;
+      late final YamuxSession computer;
+
+      phone = YamuxSession(
+        role: YamuxRole.phone,
+        onSend: (frame) => computer.receive(YamuxFrame.decode(frame.encode())),
+      );
+
+      computer = YamuxSession(
+        role: YamuxRole.computer,
+        onSend: (frame) => phone.receive(YamuxFrame.decode(frame.encode())),
+        onOpened: (id) => computer.accept(id),
+      );
+
+      final phoneStream = phone.openStream();
+      final computerStream = computer.getStream(phoneStream.id)!;
+
+      final receivedChunks = <Uint8List>[];
+      computerStream.listen(receivedChunks.add);
+
+      const largeSize = 100000;
+      final largeData = Uint8List(largeSize);
+      for (var i = 0; i < largeSize; i++) {
+        largeData[i] = i % 251;
+      }
+
+      phoneStream.add(largeData);
+      await Future<void>.delayed(Duration.zero);
+
+      final totalReceived = receivedChunks.fold<int>(0, (sum, chunk) => sum + chunk.length);
+      expect(totalReceived, equals(largeSize));
+      expect(receivedChunks.length, equals(2));
+      expect(receivedChunks[0].length, equals(yamuxMaxDataPayload));
+      expect(receivedChunks[1].length, equals(largeSize - yamuxMaxDataPayload));
+
+      final assembled = Uint8List(largeSize);
+      var offset = 0;
+      for (final chunk in receivedChunks) {
+        assembled.setRange(offset, offset + chunk.length, chunk);
+        offset += chunk.length;
+      }
+      expect(assembled, equals(largeData));
+    });
+
+    test('YamuxStream.writable and onWritable notify when send window replenishes', () async {
+      late final YamuxSession phone;
+      late final YamuxSession computer;
+
+      phone = YamuxSession(
+        role: YamuxRole.phone,
+        onSend: (frame) => computer.receive(YamuxFrame.decode(frame.encode())),
+      );
+
+      computer = YamuxSession(
+        role: YamuxRole.computer,
+        onSend: (frame) => phone.receive(YamuxFrame.decode(frame.encode())),
+      );
+
+      final phoneStream = phone.openStream();
+      final id = phoneStream.id;
+
+      final chunk = Uint8List(yamuxMaxDataPayload);
+      while (phoneStream.write(chunk) > 0) {}
+      expect(phoneStream.sendWindow, equals(0));
+
+      var callbackFired = false;
+      phoneStream.onWritable(() {
+        callbackFired = true;
+      });
+
+      var futureCompleted = false;
+      final future = phoneStream.writable.then((_) {
+        futureCompleted = true;
+      });
+
+      expect(callbackFired, isFalse);
+      expect(futureCompleted, isFalse);
+
+      computer.accept(id);
+      await future;
+
+      expect(callbackFired, isTrue);
+      expect(futureCompleted, isTrue);
+      expect(phoneStream.sendWindow, greaterThan(0));
+    });
+
+    test('YamuxFrame.ping masks values to 32-bit unsigned integers', () {
+      final ping = YamuxFrame.ping(0x100000001);
+      expect(ping.length, equals(1));
+
+      final ping2 = YamuxFrame.ping(-1);
+      expect(ping2.length, equals(0xFFFFFFFF));
+    });
   });
 }

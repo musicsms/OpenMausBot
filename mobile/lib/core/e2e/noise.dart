@@ -376,6 +376,9 @@ class NoiseInitiatorSession {
     }
 
     final re = Uint8List.sublistView(message2, 0, publicKeyBytes);
+    if (!P256.validatePublicKey(re)) {
+      throw NoiseError('bad_point');
+    }
     final ee = P256.computeSecret(_ephemeralKeyPair!.privateKey, re);
 
     _state.mixHash(re);
@@ -389,21 +392,26 @@ class NoiseInitiatorSession {
     final payload2 = _state.decryptAndHash(ciphertext);
     _state.mark('msg2.payload');
 
-    if (_conn != null) {
-      try {
-        final str = utf8.decode(payload2);
-        final json = jsonDecode(str);
-        if (json is! Map || json['v'] != 1) {
-          throw NoiseError('payload2_version');
-        }
-        if (json['conn'] != _conn) {
-          throw NoiseError('payload2_conn');
-        }
-      } on NoiseError {
-        rethrow;
-      } catch (_) {
-        throw NoiseError('payload2_version');
+    if (payload2.length > maxHandshakePayload) {
+      throw NoiseError('payload2_version');
+    }
+
+    Map<dynamic, dynamic>? json;
+    try {
+      final str = utf8.decode(payload2);
+      final parsed = jsonDecode(str);
+      if (parsed is Map) {
+        json = parsed;
       }
+    } catch (_) {
+      throw NoiseError('payload2_version');
+    }
+
+    if (json == null || json['v'] != 1) {
+      throw NoiseError('payload2_version');
+    }
+    if (_conn == null || json['conn'] != _conn) {
+      throw NoiseError('payload2_conn');
     }
 
     final splitCiphers = _state.split();
@@ -425,6 +433,12 @@ class NoiseInitiatorSession {
 }
 
 Uint8List encodePayload1({required Uint8List conn, required String app}) {
+  if (conn.length != connBytes) {
+    throw ArgumentError('conn must be $connBytes bytes');
+  }
+  if (app.length > maxAppChars) {
+    throw ArgumentError('app length cannot exceed $maxAppChars characters');
+  }
   return Uint8List.fromList(
     utf8.encode(jsonEncode({'v': 1, 'conn': b64u(conn), 'app': app})),
   );

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:convert/convert.dart';
+import 'package:mobile/core/e2e/crypto.dart';
 import 'package:mobile/core/e2e/noise.dart';
 
 void main() {
@@ -280,6 +281,134 @@ void main() {
         () => cipher.open(oversizedRecord),
         throwsA(predicate((e) => e is NoiseError && e.reason == 'record_too_large')),
       );
+    });
+
+    test('Rejects message 2 with invalid ephemeral public key re', () {
+      final tPub = Uint8List.fromList(hex.decode(vectors['V1']['transportPublic'] as String));
+      final psk = Uint8List.fromList(hex.decode(vectors['V1']['credentials'][0]['psk'] as String));
+      final session = NoiseInitiatorSession(
+        transportPublicKey: tPub,
+        psk: psk,
+        prologueByte: 1,
+      );
+      session.writeMessage1(payload: utf8.encode(vectors['inputs']['payload1'] as String));
+
+      final invalidReMessage2 = Uint8List(publicKeyBytes + tagBytes);
+      expect(
+        () => session.readMessage2(invalidReMessage2),
+        throwsA(predicate((e) => e is NoiseError && e.reason == 'bad_point')),
+      );
+    });
+
+    test('Rejects message 2 when conn is unset in session', () {
+      final tPriv = Uint8List.fromList(hex.decode(vectors['inputs']['transportPrivate'] as String));
+      final tPub = Uint8List.fromList(hex.decode(vectors['V1']['transportPublic'] as String));
+      final psk = Uint8List.fromList(hex.decode(vectors['V1']['credentials'][0]['psk'] as String));
+      final ephemeralPriv = Uint8List.fromList(hex.decode(vectors['inputs']['phoneEphemeralPrivate'] as String));
+      final compEphemeralPriv = Uint8List.fromList(hex.decode(vectors['inputs']['computerEphemeralPrivate'] as String));
+      final compE = P256KeyPair(
+        privateKey: compEphemeralPriv,
+        publicKey: P256.publicKeyFromPrivate(compEphemeralPriv),
+      );
+
+      final session = NoiseInitiatorSession(
+        transportPublicKey: tPub,
+        psk: psk,
+        prologueByte: 1,
+        fixedEphemeralPrivate: ephemeralPriv,
+      );
+      final rawPayload1 = Uint8List(16);
+      final msg1 = session.writeMessage1(payload: rawPayload1);
+
+      final respState = SymmetricState.initialize();
+      respState.mixHash(prologue(1));
+      respState.mixHash(tPub);
+      respState.mixKeyAndHash(psk);
+      final phonePub = Uint8List.sublistView(msg1, 0, publicKeyBytes);
+      respState.mixHash(phonePub);
+      respState.mixKey(phonePub);
+      final es = P256.computeSecret(tPriv, phonePub);
+      respState.mixKey(es);
+      respState.decryptAndHash(Uint8List.sublistView(msg1, publicKeyBytes));
+
+      respState.mixHash(compE.publicKey);
+      respState.mixKey(compE.publicKey);
+      final ee = P256.computeSecret(compE.privateKey, phonePub);
+      respState.mixKey(ee);
+      final payload2Bytes = utf8.encode(jsonEncode({'v': 1, 'conn': 'some_conn'}));
+      final c2 = respState.encryptAndHash(Uint8List.fromList(payload2Bytes));
+      final msg2 = Uint8List(publicKeyBytes + c2.length)
+        ..setRange(0, publicKeyBytes, compE.publicKey)
+        ..setRange(publicKeyBytes, publicKeyBytes + c2.length, c2);
+
+      expect(
+        () => session.readMessage2(msg2),
+        throwsA(predicate((e) => e is NoiseError && e.reason == 'payload2_conn')),
+      );
+    });
+
+    test('Rejects message 2 when version is not 1', () {
+      final tPriv = Uint8List.fromList(hex.decode(vectors['inputs']['transportPrivate'] as String));
+      final tPub = Uint8List.fromList(hex.decode(vectors['V1']['transportPublic'] as String));
+      final psk = Uint8List.fromList(hex.decode(vectors['V1']['credentials'][0]['psk'] as String));
+      final ephemeralPriv = Uint8List.fromList(hex.decode(vectors['inputs']['phoneEphemeralPrivate'] as String));
+      final compEphemeralPriv = Uint8List.fromList(hex.decode(vectors['inputs']['computerEphemeralPrivate'] as String));
+      final compE = P256KeyPair(
+        privateKey: compEphemeralPriv,
+        publicKey: P256.publicKeyFromPrivate(compEphemeralPriv),
+      );
+
+      final session = NoiseInitiatorSession(
+        transportPublicKey: tPub,
+        psk: psk,
+        prologueByte: 1,
+        fixedEphemeralPrivate: ephemeralPriv,
+        conn: 'some_conn',
+      );
+      final msg1 = session.writeMessage1(payload: utf8.encode('{"v":1,"conn":"some_conn"}'));
+
+      final respState = SymmetricState.initialize();
+      respState.mixHash(prologue(1));
+      respState.mixHash(tPub);
+      respState.mixKeyAndHash(psk);
+      final phonePub = Uint8List.sublistView(msg1, 0, publicKeyBytes);
+      respState.mixHash(phonePub);
+      respState.mixKey(phonePub);
+      final es = P256.computeSecret(tPriv, phonePub);
+      respState.mixKey(es);
+      respState.decryptAndHash(Uint8List.sublistView(msg1, publicKeyBytes));
+
+      respState.mixHash(compE.publicKey);
+      respState.mixKey(compE.publicKey);
+      final ee = P256.computeSecret(compE.privateKey, phonePub);
+      respState.mixKey(ee);
+      final payload2Bytes = utf8.encode(jsonEncode({'v': 2, 'conn': 'some_conn'}));
+      final c2 = respState.encryptAndHash(Uint8List.fromList(payload2Bytes));
+      final msg2 = Uint8List(publicKeyBytes + c2.length)
+        ..setRange(0, publicKeyBytes, compE.publicKey)
+        ..setRange(publicKeyBytes, publicKeyBytes + c2.length, c2);
+
+      expect(
+        () => session.readMessage2(msg2),
+        throwsA(predicate((e) => e is NoiseError && e.reason == 'payload2_version')),
+      );
+    });
+
+    test('encodePayload1 validates conn length and app length limit', () {
+      final validConn = Uint8List(connBytes);
+      expect(
+        () => encodePayload1(conn: Uint8List(connBytes - 1), app: 'test'),
+        throwsA(isA<ArgumentError>()),
+      );
+      expect(
+        () => encodePayload1(conn: validConn, app: 'a' * (maxAppChars + 1)),
+        throwsA(isA<ArgumentError>()),
+      );
+
+      final encoded = encodePayload1(conn: validConn, app: 'a' * maxAppChars);
+      final json = jsonDecode(utf8.decode(encoded)) as Map<String, dynamic>;
+      expect(json['v'], equals(1));
+      expect(json['app'], equals('a' * maxAppChars));
     });
 
     test('Stops session when nonce counter reaches limit', () {

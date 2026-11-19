@@ -413,6 +413,8 @@ const appConfigSchema = z.object({
   browserEngine: browserEngineConfigSchema.optional(),
   browserProfiles: browserProfilesSchema.optional(),
   instances: instanceConfigMapSchema.optional(),
+  /** Self-hosted relay node hostnames (1 to 4). */
+  relayNodes: z.array(z.string()).min(1).max(4).optional(),
   /** Loose on purpose: one bad server entry is skipped later, never fails the whole file. */
   mcpServers: z.record(z.string(), z.unknown()).optional(),
 });
@@ -488,6 +490,7 @@ export interface AppConfig extends HelperConfig {
   browserProfiles?: BrowserProfile[];
   browserEngine?: BrowserEngineConfig;
   instances?: InstanceConfigMap;
+  relayNodes?: string[];
 }
 export type BrowserProfile = z.output<typeof browserProfileSchema> & {
   partitionId?: string;
@@ -769,6 +772,17 @@ export function loadConfig(): AppConfig {
   if (process.env.OMB_GEMINI_IMAGE_KEY !== undefined) cfg.imageGen.geminiKey = process.env.OMB_GEMINI_IMAGE_KEY;
   const signInEnv = signInFromEnv();
   if (signInEnv.admins || signInEnv.members) cfg.signIn = { ...cfg.signIn, ...signInEnv };
+  if (process.env.OMB_PHONE_RELAY_NODES !== undefined) {
+    const raw = process.env.OMB_PHONE_RELAY_NODES.trim();
+    if (raw.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) cfg.relayNodes = parsed.map(String);
+      } catch {}
+    } else {
+      cfg.relayNodes = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
   return cfg;
 }
 

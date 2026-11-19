@@ -88,6 +88,14 @@ reveals nothing about `psk`: the two are separate HMAC outputs under different l
     first use), and pins it from then on.
   - A pin mismatch is a hard stop (section 12).
 
+### Self-hosted relay
+
+In self-hosted relay mode:
+- The relay host allowlist is not restricted to `^relay[1-9][0-9]?\.openmausbot\.com$`. The server's allowed relay hostnames are configured via `relayNodes`.
+- The phone (e.g. Flutter companion) has no `openmausbot.com` allowlist; it accepts relay hosts **only from a scanned QR code** (which also pins `k`, making the QR the sole trust root). It stores them with the pairing and NEVER replaces or updates relay hosts from `/api/pair`, `/api/companion/endpoints`, or the `companion.endpoints` event.
+- Relay host syntax MUST be a valid DNS name: labels of 1–63 alphanumeric characters (hyphens permitted internally), dot-separated, ending with at least a 2-letter alphabetic TLD, with total length between 1 and 253 characters. Schemes (`http://`, `wss://`), ports (`:8080`), paths (`/v1`), and IP literals (`127.0.0.1`, `[::1]`) are forbidden.
+- Test vectors for self-hosted hostname validation are defined in `vectors/self-hosted.json` and pinned by `vectors/self-hosted.sha256`.
+
 ## 4. Routes and URLs
 
 | Route | URL the phone dials | WebSocket subprotocol | Prologue `transport` byte |

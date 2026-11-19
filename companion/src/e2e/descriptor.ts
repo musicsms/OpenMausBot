@@ -7,6 +7,17 @@ export const DESCRIPTOR_VERSION = 1;
 export const MAX_DESCRIPTOR_CHARS = 1024;
 export const MAX_RELAY_NODES = 4;
 export const RELAY_HOST = /^relay[1-9][0-9]?\.openmausbot\.com$/;
+const DNS_NAME = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+
+export function isValidSelfHostedHost(host: unknown): boolean {
+  if (typeof host !== "string" || host.length < 1 || host.length > 253) return false;
+  return DNS_NAME.test(host);
+}
+
+export function isValidRelayHost(host: unknown, allowCustom = false): boolean {
+  if (typeof host !== "string") return false;
+  return allowCustom ? isValidSelfHostedHost(host) : RELAY_HOST.test(host);
+}
 
 export type DescriptorRoutes = "any" | "local";
 

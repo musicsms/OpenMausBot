@@ -165,7 +165,10 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
       }
       else if (arg === "--tunnel" || arg === "--relay") options[arg === "--tunnel" ? "tunnel" : "relay"] = true;
       else if (arg === "--relay-self-hosted") options.relaySelfHosted = true;
-      else if (arg === "--relay-node") options.relayNodes = [...(options.relayNodes ?? []), value()];
+      else if (arg === "--relay-node") {
+        options.relaySelfHosted = true;
+        options.relayNodes = [...(options.relayNodes ?? []), value()];
+      }
       else if (arg === "--client" || (options.command === "pair" && arg === "--chat-only")) options.client = true;
       // Which phone will scan; only Android needs a different QR. `pair --phone` alone is a chat-only code for any phone.
       else if (arg === "--phone") {
@@ -215,12 +218,14 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
   if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65_535) return { error: "--port must be 1-65535" };
   const publicUrlRefusal = options.publicUrl ? publicUrlProblem(options.publicUrl) : null;
   if (publicUrlRefusal) return { error: publicUrlRefusal };
-  if (options.relay && options.relaySelfHosted) return { error: "choose one of --relay (hosted MausBot Relay) and --relay-self-hosted (self-hosted relay)" };
-  if (options.tunnel && (options.tailscale || options.relay || options.relaySelfHosted)) return { error: options.relay ? "choose one of --relay (phones through MausBot Relay) and --tunnel (a public address)" : options.relaySelfHosted ? "choose one of --relay-self-hosted (phones through self-hosted relay) and --tunnel (a public address)" : "choose one of --tailscale (your tailnet) and --tunnel (a public address)" };
+  const isSelfHosted = options.relaySelfHosted || Boolean(options.relayNodes?.length);
+  if (isSelfHosted) options.relaySelfHosted = true;
+  if (options.relay && isSelfHosted) return { error: "choose one of --relay (hosted MausBot Relay) and --relay-self-hosted (self-hosted relay)" };
+  if (options.tunnel && (options.tailscale || options.relay || isSelfHosted)) return { error: options.relay ? "choose one of --relay (phones through MausBot Relay) and --tunnel (a public address)" : isSelfHosted ? "choose one of --relay-self-hosted (phones through self-hosted relay) and --tunnel (a public address)" : "choose one of --tailscale (your tailnet) and --tunnel (a public address)" };
   if (options.command === "access" && !options.accessAction) return { error: "access needs one of: list, add EMAIL [--chat-only], remove EMAIL" };
   if (options.command === "service" && !options.serviceAction) return { error: "service needs one of: install [the same options as serve], uninstall" };
   if (options.domain && (options.tailscale || options.tunnel || options.publicUrl)) return { error: "--domain already gives the server its address; drop --tailscale, --tunnel and --public-url" };
-  if (options.local && (options.tailscale || options.tunnel || options.publicUrl || options.lan || options.relay || options.relaySelfHosted)) return { error: "--local cannot be combined with a remote-access option" };
+  if (options.local && (options.tailscale || options.tunnel || options.publicUrl || options.lan || options.relay || isSelfHosted)) return { error: "--local cannot be combined with a remote-access option" };
   if (options.command === "browser" && !options.browserAction) return { error: "browser needs an action: install or status" };
   if (options.command === "fleet") {
     if (!options.fleetAction) return { error: "fleet needs one of: init --domain HOST [--operator USER], create NAME --admin EMAIL, list, users NAME add|remove EMAIL, suspend NAME, resume NAME, delete NAME --yes, upgrade, agent" };

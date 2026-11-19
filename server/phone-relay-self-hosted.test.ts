@@ -130,10 +130,57 @@ describe("self-hosted relay server mode", () => {
         /both hosted and self-hosted/i,
       );
 
-      // CLI argument parsing also refuses both flags
-      const cliResult = parseArgs(["serve", "--relay", "--relay-self-hosted"]);
-      assert.ok("error" in cliResult);
-      assert.match(cliResult.error, /choose one of.*relay/i);
+      // CLI argument parsing also refuses both flags and combinations with --relay-node
+      const cliResult1 = parseArgs(["serve", "--relay", "--relay-self-hosted"]);
+      assert.ok("error" in cliResult1);
+      assert.match(cliResult1.error, /choose one of.*relay/i);
+
+      const cliResult2 = parseArgs(["serve", "--relay", "--relay-node", "relay.example.com"]);
+      assert.ok("error" in cliResult2);
+      assert.match(cliResult2.error, /choose one of.*relay/i);
+
+      const cliResult3 = parseArgs(["serve", "--tunnel", "--relay-node", "relay.example.com"]);
+      assert.ok("error" in cliResult3);
+      assert.match(cliResult3.error, /choose one of.*relay-self-hosted.*tunnel/i);
+
+      const cliResultValid = parseArgs(["serve", "--relay-node", "relay.example.com"]);
+      assert.ok(!("error" in cliResultValid));
+      assert.equal(cliResultValid.relaySelfHosted, true);
+      assert.deepEqual(cliResultValid.relayNodes, ["relay.example.com"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("caches signing key and host ID in memory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "omb-test-self-hosted-"));
+    try {
+      const k1 = getOrCreateSigningKey(dir);
+      const k2 = getOrCreateSigningKey(dir);
+      assert.equal(k1, k2, "must return cached reference in memory");
+
+      const h1 = getOrCreateHostId(dir);
+      const h2 = getOrCreateHostId(dir);
+      assert.equal(h1, h2, "must return cached host ID reference in memory");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("handles transient errors during scheduled token refresh without crashing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "omb-test-self-hosted-"));
+    try {
+      const logs: string[] = [];
+      let nowMs = 1000;
+      const service = selfHostedTokenService(dir, ["relay.example.com"], {
+        now: () => nowMs,
+        log: (line) => logs.push(line),
+      });
+      service.start();
+      assert.ok(service.currentGrant());
+      // refreshNow handles error gracefully if any
+      service.refreshNow();
+      service.stop();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

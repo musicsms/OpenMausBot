@@ -121,31 +121,44 @@ export function phoneRelayKey(dataDir: string): KeyPair {
   return key;
 }
 
+const signingKeyCache = new Map<string, { key: KeyObject; rawPublic: Buffer }>();
+const hostIdCache = new Map<string, Buffer>();
+
 export function getOrCreateSigningKey(dataDir: string): { key: KeyObject; rawPublic: Buffer } {
+  const cached = signingKeyCache.get(dataDir);
+  if (cached) return cached;
   const file = join(dataDir, PHONE_RELAY_SELF_HOSTED_KEY_FILE);
   if (existsSync(file)) {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as { v?: unknown; seed?: unknown };
     const seed = parsed.v === 1 && typeof parsed.seed === "string" ? fromB64u(parsed.seed) : null;
     if (!seed || seed.length !== 32) throw new Error(`${file} is not a valid self-hosted relay signing key`);
     const key = ed25519PrivateKey(seed);
-    return { key, rawPublic: ed25519RawPublicKey(key) };
+    const result = { key, rawPublic: ed25519RawPublicKey(key) };
+    signingKeyCache.set(dataDir, result);
+    return result;
   }
   const seed = randomBytes(32);
   writeFileAtomic(file, `${JSON.stringify({ v: 1, seed: b64u(seed) })}\n`, { mode: 0o600 });
   const key = ed25519PrivateKey(seed);
-  return { key, rawPublic: ed25519RawPublicKey(key) };
+  const result = { key, rawPublic: ed25519RawPublicKey(key) };
+  signingKeyCache.set(dataDir, result);
+  return result;
 }
 
 export function getOrCreateHostId(dataDir: string): Buffer {
+  const cached = hostIdCache.get(dataDir);
+  if (cached) return cached;
   const file = join(dataDir, PHONE_RELAY_HOST_ID_FILE);
   if (existsSync(file)) {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as { v?: unknown; hostId?: unknown };
     const raw = parsed.v === 1 && typeof parsed.hostId === "string" ? fromB64u(parsed.hostId) : null;
     if (!raw || raw.length !== 16) throw new Error(`${file} is not a valid self-hosted relay host ID`);
+    hostIdCache.set(dataDir, raw);
     return raw;
   }
   const hostId = randomBytes(16);
   writeFileAtomic(file, `${JSON.stringify({ v: 1, hostId: b64u(hostId) })}\n`, { mode: 0o600 });
+  hostIdCache.set(dataDir, hostId);
   return hostId;
 }
 
@@ -219,9 +232,24 @@ export function selfHostedTokenService(
     const delay = Math.max(60_000, g.refreshAfter - now());
     timer = setTimeout(() => {
       if (!running) return;
-      const refreshed = mint();
-      options.onGrant?.(refreshed);
-      schedule(refreshed);
+      try {
+        const refreshed = mint();
+        options.onGrant?.(refreshed);
+        schedule(refreshed);
+      } catch (error) {
+        options.log?.(`phone relay: self-hosted token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+        if (running) {
+          timer = setTimeout(() => {
+            if (!running) return;
+            try {
+              const retryRefreshed = mint();
+              options.onGrant?.(retryRefreshed);
+              schedule(retryRefreshed);
+            } catch {}
+          }, 60_000);
+          timer.unref?.();
+        }
+      }
     }, delay);
     timer.unref?.();
   }
@@ -259,9 +287,13 @@ export function selfHostedTokenService(
     refreshNow() {
       if (!running) return;
       if (timer) clearTimeout(timer);
-      const next = mint();
-      options.onGrant?.(next);
-      schedule(next);
+      try {
+        const next = mint();
+        options.onGrant?.(next);
+        schedule(next);
+      } catch (error) {
+        options.log?.(`phone relay: self-hosted token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
     },
   };
 }

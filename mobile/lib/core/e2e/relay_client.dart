@@ -75,7 +75,11 @@ Future<RelayWebSocket> defaultWebSocketConnector(
   Uri uri, {
   Iterable<String>? protocols,
 }) async {
-  final ws = await WebSocket.connect(uri.toString(), protocols: protocols);
+  final override = Platform.environment['OMB_RELAY_URL'];
+  final targetUri = override != null
+      ? Uri.parse('${override.replaceAll(RegExp(r'/+$'), '')}${uri.path}')
+      : uri;
+  final ws = await WebSocket.connect(targetUri.toString(), protocols: protocols);
   return IORelayWebSocket(ws);
 }
 

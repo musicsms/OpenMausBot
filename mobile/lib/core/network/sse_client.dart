@@ -44,6 +44,7 @@ class SseNetworkClient {
         _connector = connector;
 
   bool get isE2E => e2e != null;
+  bool get isDeviceRemoved => _relayClient?.isDeviceRemoved ?? false;
 
   /// Back-compat for tests that still read these fields.
   String get lanUrl {

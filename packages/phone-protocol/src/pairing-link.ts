@@ -19,13 +19,14 @@ export interface PairingE2EDescriptor {
 
 const B64U_FIELD = /^[A-Za-z0-9_-]+$/;
 const RELAY_HOST = /^relay[1-9][0-9]?\.openmausbot\.com$/;
+const DNS_NAME = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 
 /** The QR's `e2e` value, or null for anything a phone would refuse: then the link goes out without it, as from a
  * computer without the encrypted connection. A QR never says "local": a restriction is set per phone, later. */
 export function encodePairingE2E(descriptor: PairingE2EDescriptor | null | undefined): string | null {
   if (!descriptor || descriptor.v !== 1 || typeof descriptor.k !== "string" || descriptor.k.length !== 87 || !B64U_FIELD.test(descriptor.k)) return null;
   const relay = typeof descriptor.h === "string" && Array.isArray(descriptor.r) && descriptor.r.length >= 1 && descriptor.r.length <= 4
-    && descriptor.h.length === 22 && B64U_FIELD.test(descriptor.h) && descriptor.r.every((node) => RELAY_HOST.test(node))
+    && descriptor.h.length === 22 && B64U_FIELD.test(descriptor.h) && descriptor.r.every((node) => typeof node === "string" && node.length <= 253 && (RELAY_HOST.test(node) || DNS_NAME.test(node)))
     ? { h: descriptor.h, r: descriptor.r }
     : {};
   const json = JSON.stringify({ v: 1, k: descriptor.k, ...relay });

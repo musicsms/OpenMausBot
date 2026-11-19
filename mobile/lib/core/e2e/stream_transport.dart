@@ -380,7 +380,15 @@ class YamuxHttpClient extends http.BaseClient {
     final stream = session.openStream();
     stream.add(serialized);
     await stream.writable;
-    stream.finish();
+    final accept = request.headers.entries
+        .firstWhere(
+          (e) => e.key.toLowerCase() == 'accept',
+          orElse: () => const MapEntry('', ''),
+        )
+        .value;
+    if (accept.toLowerCase() != 'text/event-stream') {
+      stream.finish();
+    }
     return parseHttpResponse(stream, request: request);
   }
 }

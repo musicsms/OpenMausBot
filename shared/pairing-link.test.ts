@@ -185,10 +185,12 @@ describe("phonePairingLink", () => {
     expect(parsed).toMatchObject({ outcome: "ok", descriptor: e2e });
     const direct = phonePairingLink({ address: "192.168.1.5", port: 8810, token, e2e: { v: 1, k } })!;
     expect(parseDescriptor(new URL(direct).searchParams.get("e2e"))).toMatchObject({ outcome: "ok", descriptor: { v: 1, k } });
-    for (const bad of [{ v: 1 as const, k: "short" }, { ...e2e, r: ["relay.example.com"] }]) {
+    for (const bad of [{ v: 1 as const, k: "short" }, { ...e2e, r: ["invalid..host"] }]) {
       const fallback = phonePairingLink({ address: "192.168.1.5", port: 8810, token, e2e: bad })!;
       expect(rawField(fallback, "e2e") === undefined || parseDescriptor(new URL(fallback).searchParams.get("e2e")).outcome === "ok").toBe(true);
     }
+    const selfHosted = phonePairingLink({ address: "192.168.1.5", port: 8810, token, e2e: { ...e2e, r: ["relay.example.com"] } })!;
+    expect(rawField(selfHosted, "e2e")).toBeDefined();
     expect(rawField(phonePairingLink({ address: "192.168.1.5", port: 8810, token, e2e: { v: 1, k: "short" } })!, "e2e")).toBeUndefined();
   });
 });

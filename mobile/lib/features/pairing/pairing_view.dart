@@ -29,6 +29,8 @@ class PairingView extends StatefulWidget {
   final Future<void> Function(ManualPairRequest request) onManualCodeSubmit;
   final Widget? scannerWidget;
   final String? errorMessage;
+  final String? bannerMessage;
+  final VoidCallback? onCancel;
   final bool isBusy;
 
   const PairingView({
@@ -37,6 +39,8 @@ class PairingView extends StatefulWidget {
     required this.onManualCodeSubmit,
     this.scannerWidget,
     this.errorMessage,
+    this.bannerMessage,
+    this.onCancel,
     this.isBusy = false,
   });
 
@@ -77,6 +81,12 @@ class PairingViewState extends State<PairingView> {
         title: const Text('Pair with Desktop', style: TextStyle(color: Colors.white)),
         backgroundColor: GrokTheme.oledBlack,
         elevation: 0,
+        leading: widget.onCancel != null
+            ? IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: widget.onCancel,
+              )
+            : null,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -85,6 +95,23 @@ class PairingViewState extends State<PairingView> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                if (widget.bannerMessage != null) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: GrokTheme.darkCharcoal,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: GrokTheme.glowCyan),
+                    ),
+                    child: Text(
+                      widget.bannerMessage!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ),
+                ],
                 Container(
                   height: 180,
                   width: 180,

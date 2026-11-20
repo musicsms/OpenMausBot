@@ -8,14 +8,44 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:mobile/core/e2e/descriptor.dart';
+import 'package:mobile/core/e2e/relay_client.dart';
 import 'package:mobile/core/network/sse_client.dart';
 import 'package:mobile/core/storage/pairing_storage.dart';
 import 'package:mobile/core/theme/grok_theme.dart';
 import 'package:mobile/features/approvals/approval_card.dart';
 import 'package:mobile/features/approvals/approval_model.dart';
 import 'package:mobile/features/pairing/pairing_model.dart';
+import 'package:mobile/main.dart';
 
 class _RealHttpOverrides extends HttpOverrides {}
+
+class FakePhoneRelayClient extends PhoneRelayClient {
+  final http.Client _client;
+  bool _connected = false;
+
+  FakePhoneRelayClient({
+    required super.descriptor,
+    required http.Client httpClient,
+    super.credentialToken = 'dummy',
+  }) : _client = httpClient;
+
+  @override
+  bool get isConnected => _connected;
+
+  @override
+  http.Client get httpClient => _client;
+
+  @override
+  Future<void> connect() async {
+    _connected = true;
+  }
+
+  @override
+  Future<void> close() async {
+    _connected = false;
+  }
+}
 
 void main() {
   test('E2E Flow: Pair redeem stores omb_ token then streams /api/events', () async {
@@ -254,5 +284,240 @@ void main() {
       process.kill();
       await process.exitCode;
     }
+  });
+
+  test('E2E Flow: E2E descriptor pairing redeems token over relay, pins k in storage, and routes SSE events through relay', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final storage = PairingStorage();
+
+    final desc = E2EDescriptor.parseJson({
+      'v': 1,
+      'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+      'h': 'lz81isB3BuNV6rHgYgG3Wg',
+      'r': ['relay.example.com'],
+    });
+
+    final qrUri = 'openmausbot://pair?token=omb_pair_secret_val&name=SecureStudio&e2e=${desc.toB64u()}';
+    final payload = PairingPayload.fromJsonString(qrUri);
+    expect(payload.e2e, isNotNull);
+
+    var relayPairCalled = false;
+    var relayStreamCalled = false;
+    var plainHttpCalled = false;
+
+    final mockRelayHttp = MockClient((request) async {
+      if (request.url.path == '/api/pair') {
+        relayPairCalled = true;
+        return http.Response(
+          jsonEncode({
+            'token': 'omb_e2e_live_device_token_xyz123456789012345',
+            'device': {'id': 'd-e2e', 'name': 'Phone'},
+            'serverName': 'SecureStudio',
+            'endpoints': [],
+            'e2e': desc.toJson(),
+          }),
+          200,
+        );
+      }
+      if (request.url.path == '/api/health') {
+        return http.Response('{"app":"openmausbot"}', 200);
+      }
+      if (request.url.path == '/api/events') {
+        relayStreamCalled = true;
+        return http.Response(
+          'data: {"kind":"hello"}\n\n'
+          'data: {"kind":"message","message":{"text":"Encrypted E2E hello","role":"bot"}}\n\n',
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        );
+      }
+      return http.Response('Not found', 404);
+    });
+
+    final mockPlainHttp = MockClient((request) async {
+      plainHttpCalled = true;
+      return http.Response('Forbidden', 403);
+    });
+
+    final fakeRelay = FakePhoneRelayClient(
+      descriptor: payload.e2e!,
+      httpClient: mockRelayHttp,
+      credentialToken: payload.credential,
+    );
+
+    final pair = await SseNetworkClient.redeemPair(
+      deviceName: 'Secure Phone',
+      credential: payload.credential,
+      e2e: payload.e2e,
+      relayClient: fakeRelay,
+      httpClient: mockPlainHttp,
+    );
+
+    expect(relayPairCalled, isTrue);
+    expect(plainHttpCalled, isFalse);
+    expect(pair.token, startsWith('omb_'));
+    expect(pair.e2e, isNotNull);
+
+    await storage.saveDeviceToken(pair.token);
+    await storage.saveE2EIdentity(
+      transportPublicKey: pair.e2e!.k,
+      hostId: pair.e2e!.h,
+      relayNodes: pair.e2e!.relayNodes,
+    );
+
+    final storedIdentity = await storage.getE2EIdentity();
+    expect(storedIdentity, isNotNull);
+    expect(storedIdentity!.k, desc.k);
+    expect(storedIdentity.h, desc.h);
+    expect(storedIdentity.r, ['relay.example.com']);
+
+    final sessionRelay = FakePhoneRelayClient(
+      descriptor: (await storage.getE2EDescriptor())!,
+      httpClient: mockRelayHttp,
+      credentialToken: (await storage.getDeviceToken())!,
+    );
+
+    final sseClient = SseNetworkClient(
+      deviceToken: (await storage.getDeviceToken())!,
+      e2e: await storage.getE2EDescriptor(),
+      relayClient: sessionRelay,
+      httpClient: mockPlainHttp,
+    );
+
+    expect(sseClient.isE2E, isTrue);
+    final event = await sseClient.streamEvents().firstWhere((e) => e.kind == 'message');
+    expect(relayStreamCalled, isTrue);
+    expect(plainHttpCalled, isFalse);
+    expect(event.data['message']['text'], 'Encrypted E2E hello');
+  });
+
+  testWidgets('E2E Flow: Migration banner shown when server returns e2e but storage has no pinned k, and clears old credentials upon re-pair', (WidgetTester tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final storage = PairingStorage();
+    await storage.saveDeviceToken('omb_old_plain_token');
+    await storage.saveEndpoints(lanUrl: 'http://127.0.0.1:8810');
+
+    final desc = E2EDescriptor.parseJson({
+      'v': 1,
+      'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+      'h': 'lz81isB3BuNV6rHgYgG3Wg',
+      'r': ['relay.example.com'],
+    });
+
+    final mockHttp = MockClient((request) async {
+      if (request.url.path == '/api/health') {
+        return http.Response('{"app":"openmausbot"}', 200);
+      }
+      if (request.url.path == '/api/bots') {
+        return http.Response(jsonEncode([{'id': 'bot-1', 'name': 'Assistant'}]), 200);
+      }
+      if (request.url.path == '/api/companion/endpoints') {
+        return http.Response(
+          jsonEncode({
+            'serverName': 'OpenMausBot Desktop',
+            'endpoints': [{'url': 'http://127.0.0.1:8810', 'kind': 'lan', 'priority': 200}],
+            'e2e': desc.toJson(),
+          }),
+          200,
+        );
+      }
+      if (request.url.path == '/api/events') {
+        return http.Response(
+          'data: {"kind":"hello"}\n\n',
+          200,
+          headers: {'content-type': 'text/event-stream'},
+        );
+      }
+      return http.Response('OK', 200);
+    });
+
+    await tester.pumpWidget(
+      MausBotApp(
+        storage: storage,
+        httpClient: mockHttp,
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pair again to connect from anywhere'), findsOneWidget);
+    expect(find.text('Pair again'), findsOneWidget);
+
+    await tester.tap(find.text('Pair again'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pair with Desktop'), findsOneWidget);
+  });
+
+  test('E2E Flow: redeemPair ignores network e2e and manual pairing does not persist E2E identity', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final storage = PairingStorage();
+
+    final qrDesc = E2EDescriptor.parseJson({
+      'v': 1,
+      'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+      'h': 'lz81isB3BuNV6rHgYgG3Wg',
+      'r': ['trusted-qr-relay.example.com'],
+    });
+
+    final rogueDescJson = {
+      'v': 1,
+      'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
+      'h': 'lz81isB3BuNV6rHgYgG3Wg',
+      'r': ['rogue-network-relay.example.com'],
+    };
+
+    final mockRelayHttp = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'token': 'omb_device_token_abc',
+          'device': {'id': 'd-test', 'name': 'Phone'},
+          'serverName': 'TestServer',
+          'endpoints': [],
+          'e2e': rogueDescJson,
+        }),
+        200,
+      );
+    });
+
+    final fakeRelay = FakePhoneRelayClient(
+      descriptor: qrDesc,
+      httpClient: mockRelayHttp,
+      credentialToken: 'omb_pair_secret',
+    );
+
+    final pair = await SseNetworkClient.redeemPair(
+      deviceName: 'Phone',
+      credential: 'omb_pair_secret',
+      e2e: qrDesc,
+      relayClient: fakeRelay,
+    );
+
+    expect(pair.e2e, isNotNull);
+    expect(pair.e2e!.relayNodes, ['trusted-qr-relay.example.com']);
+    expect(pair.e2e!.relayNodes, isNot(contains('rogue-network-relay.example.com')));
+
+    final manualMockHttp = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'token': 'omb_manual_token_123',
+          'device': {'id': 'd-manual', 'name': 'Phone'},
+          'serverName': 'ManualServer',
+          'endpoints': [],
+          'e2e': rogueDescJson,
+        }),
+        200,
+      );
+    });
+
+    final manualPair = await SseNetworkClient.redeemPair(
+      baseUrl: 'http://127.0.0.1:8810',
+      deviceName: 'Phone',
+      code: '123456',
+      httpClient: manualMockHttp,
+    );
+
+    expect(manualPair.e2e, isNull);
+    expect(await storage.getE2EIdentity(), isNull);
   });
 }

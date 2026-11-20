@@ -45,6 +45,8 @@ class _MausBotAppState extends State<MausBotApp> {
   String? _pairError;
   bool _isLoading = true;
   bool _isPairing = false;
+  bool _showPairAgainBanner = false;
+  bool _isRePairing = false;
 
   @override
   void initState() {
@@ -57,12 +59,14 @@ class _MausBotAppState extends State<MausBotApp> {
   Future<void> _restoreSession() async {
     final token = await _storage.getDeviceToken();
     final botId = await _storage.getBotId();
+    final e2eDescriptor = await _storage.getE2EDescriptor();
     if (token != null && _sseClient == null) {
       final endpoints = await _storage.getEndpoints();
       _sseClient = SseNetworkClient(
         endpoints: endpoints,
         deviceToken: token,
         httpClient: widget.httpClient,
+        e2e: e2eDescriptor,
       );
       final active = await _safeActiveLabel(_sseClient!);
       if (mounted) {
@@ -73,6 +77,7 @@ class _MausBotAppState extends State<MausBotApp> {
           _isLoading = false;
         });
       }
+      _checkE2EMigration();
       return;
     }
 
@@ -82,6 +87,34 @@ class _MausBotAppState extends State<MausBotApp> {
         _botId = botId;
         _isLoading = false;
       });
+    }
+    _checkE2EMigration();
+  }
+
+  Future<void> _checkE2EMigration() async {
+    final e2e = await _storage.getE2EIdentity();
+    if (e2e != null && e2e.k.isNotEmpty) return;
+    if (_sseClient == null) return;
+    try {
+      final endpointsInfo = await _sseClient!.getEndpointsInfo();
+      if (endpointsInfo != null && endpointsInfo['e2e'] != null) {
+        if (mounted) {
+          setState(() {
+            _showPairAgainBanner = true;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onServerE2EDetected(dynamic e2e) async {
+    final stored = await _storage.getE2EIdentity();
+    if (stored == null || stored.k.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _showPairAgainBanner = true;
+        });
+      }
     }
   }
 
@@ -142,7 +175,7 @@ class _MausBotAppState extends State<MausBotApp> {
 
     try {
       final dialUrl = payload.dialUrl;
-      if (dialUrl == null || dialUrl.isEmpty) {
+      if (payload.e2e == null && (dialUrl == null || dialUrl.isEmpty)) {
         throw Exception('pairing invite has no reachable host');
       }
 
@@ -152,21 +185,45 @@ class _MausBotAppState extends State<MausBotApp> {
         credential: payload.credential.isNotEmpty ? payload.credential : null,
         code: payload.code,
         httpClient: widget.httpClient,
+        e2e: payload.e2e,
       );
 
+      _sseClient?.close();
+      _sseClient = null;
+
+      await _storage.clear();
+
       final endpoints = result.endpoints.isNotEmpty ? result.endpoints : payload.endpoints;
+      final e2eDesc = payload.e2e;
+
       final client = widget.sseClient ??
           SseNetworkClient(
             endpoints: endpoints,
             deviceToken: result.token,
             httpClient: widget.httpClient,
+            e2e: e2eDesc,
           );
+
+      if (e2eDesc != null) {
+        await _storage.saveE2EIdentity(
+          transportPublicKey: e2eDesc.k,
+          hostId: e2eDesc.h,
+          relayNodes: e2eDesc.relayNodes,
+        );
+      }
 
       await _persistPairResult(
         result: result,
         fallbackEndpoints: payload.endpoints,
         client: client,
       );
+
+      if (mounted) {
+        setState(() {
+          _isRePairing = false;
+          _showPairAgainBanner = false;
+        });
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -191,6 +248,11 @@ class _MausBotAppState extends State<MausBotApp> {
         httpClient: widget.httpClient,
       );
 
+      _sseClient?.close();
+      _sseClient = null;
+
+      await _storage.clear();
+
       final endpoints = result.endpoints.isNotEmpty
           ? result.endpoints
           : [
@@ -213,6 +275,13 @@ class _MausBotAppState extends State<MausBotApp> {
         fallbackEndpoints: endpoints,
         client: client,
       );
+
+      if (mounted) {
+        setState(() {
+          _isRePairing = false;
+          _showPairAgainBanner = false;
+        });
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -241,13 +310,15 @@ class _MausBotAppState extends State<MausBotApp> {
       );
     }
 
-    if (_deviceToken == null || _sseClient == null) {
+    if (_deviceToken == null || _sseClient == null || _isRePairing) {
       return PairingView(
         scannerWidget: widget.scannerWidget,
         onPairSuccess: _onPairSuccess,
         onManualCodeSubmit: _onManualCodeSubmit,
         errorMessage: _pairError,
         isBusy: _isPairing,
+        bannerMessage: _showPairAgainBanner ? 'Pair again to connect from anywhere' : null,
+        onCancel: _isRePairing ? () => setState(() => _isRePairing = false) : null,
       );
     }
 
@@ -255,6 +326,9 @@ class _MausBotAppState extends State<MausBotApp> {
       sseClient: _sseClient!,
       botId: _botId,
       connectionLabel: _connectionLabel,
+      showPairAgainBanner: _showPairAgainBanner,
+      onPairAgain: () => setState(() => _isRePairing = true),
+      onServerE2EDetected: _onServerE2EDetected,
       onBotIdResolved: (botId) async {
         await _storage.saveBotId(botId);
         if (mounted) setState(() => _botId = botId);
@@ -267,6 +341,9 @@ class ChatConnectedView extends StatefulWidget {
   final SseNetworkClient sseClient;
   final String? botId;
   final String connectionLabel;
+  final bool showPairAgainBanner;
+  final VoidCallback? onPairAgain;
+  final ValueChanged<dynamic>? onServerE2EDetected;
   final ValueChanged<String>? onBotIdResolved;
 
   const ChatConnectedView({
@@ -274,6 +351,9 @@ class ChatConnectedView extends StatefulWidget {
     required this.sseClient,
     this.botId,
     this.connectionLabel = 'Online',
+    this.showPairAgainBanner = false,
+    this.onPairAgain,
+    this.onServerE2EDetected,
     this.onBotIdResolved,
   });
 
@@ -312,6 +392,10 @@ class _ChatConnectedViewState extends State<ChatConnectedView> {
           _botId = bots.first['id'] as String?;
           if (_botId != null) widget.onBotIdResolved?.call(_botId!);
         }
+      }
+      final info = await widget.sseClient.getEndpointsInfo();
+      if (info != null && info['e2e'] != null) {
+        widget.onServerE2EDetected?.call(info['e2e']);
       }
       final label = await _labelForActive();
       if (mounted) setState(() => _connectionLabel = label);
@@ -354,6 +438,9 @@ class _ChatConnectedViewState extends State<ChatConnectedView> {
 
   void _onEvent(CompanionEvent event) {
     if (event.id != null) _lastEventId = event.id;
+    if (event.data['e2e'] != null) {
+      widget.onServerE2EDetected?.call(event.data['e2e']);
+    }
     final kind = event.kind;
     if (kind == 'hello') {
       if (mounted) {
@@ -480,7 +567,7 @@ class _ChatConnectedViewState extends State<ChatConnectedView> {
 
   @override
   Widget build(BuildContext context) {
-    return ChatView(
+    final chat = ChatView(
       messages: _messages,
       isStreaming: _isStreaming,
       onSendMessage: _handleSendMessage,
@@ -488,6 +575,45 @@ class _ChatConnectedViewState extends State<ChatConnectedView> {
       pendingApproval: _pendingApproval,
       onApprove: () => _resolveApproval('allow'),
       onReject: () => _resolveApproval('deny'),
+    );
+
+    if (!widget.showPairAgainBanner) return chat;
+
+    return Scaffold(
+      backgroundColor: GrokTheme.oledBlack,
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: GrokTheme.darkCharcoal,
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Pair again to connect from anywhere',
+                      style: TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GrokTheme.glowCyan,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: widget.onPairAgain,
+                    child: const Text('Pair again', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(child: chat),
+        ],
+      ),
     );
   }
 }

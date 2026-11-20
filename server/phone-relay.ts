@@ -2,7 +2,7 @@
 // The server dials out to the relay, the phone dials the relay, and the relay splices sealed bytes it cannot open. Every
 // encrypted stream lands in the server's own request handler as a remote request, so a phone signs in with its own session.
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual, type KeyObject } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
@@ -10,8 +10,8 @@ import type { Duplex } from "node:stream";
 
 import { phonePairingLink, type CompanionEndpoint } from "../shared/pairing-link.ts";
 import { relayBaseUrlOverride } from "../companion/src/e2e/config.ts";
-import { b64u, fromB64u } from "../companion/src/e2e/credentials.ts";
-import type { E2EDescriptor } from "../companion/src/e2e/descriptor.ts";
+import { b64u, ed25519PrivateKey, ed25519RawPublicKey, fromB64u, mintRelayToken, RELAY_TOKEN_TTL_S, type RelayTokenClaims } from "../companion/src/e2e/credentials.ts";
+import { isValidSelfHostedHost, type E2EDescriptor } from "../companion/src/e2e/descriptor.ts";
 import { generateKeyPair, keyPairFromPrivate, TRANSPORT_RELAY, type KeyPair } from "../companion/src/e2e/noise.ts";
 import { createE2EOrigin, e2eContextOf, type E2EOriginDeadlines } from "../companion/src/e2e/origin.ts";
 import { E2ERegistry, type E2EContext, type E2EDevices, type Peer } from "../companion/src/e2e/registry.ts";
@@ -29,9 +29,13 @@ import { describeTunnelAccount, FLEET_CREDENTIAL_ENV, fleetCredential, openTunne
 import type { E2ESession } from "../companion/src/e2e/session.ts";
 
 export const PHONE_RELAY_ENV = "OMB_PHONE_RELAY";
+export const PHONE_RELAY_SELF_HOSTED_ENV = "OMB_PHONE_RELAY_SELF_HOSTED";
+export const PHONE_RELAY_NODES_ENV = "OMB_PHONE_RELAY_NODES";
 /** `serve --tunnel` sets it. OMB_TUNNEL_SOCKET alone is no tunnel: Docker's Caddy reaches the server over that socket. */
 export const SERVES_TUNNEL_ENV = "OMB_SERVES_TUNNEL";
 export const PHONE_RELAY_KEY_FILE = "phone-relay-key.json";
+export const PHONE_RELAY_SELF_HOSTED_KEY_FILE = "phone-relay-token-key.json";
+export const PHONE_RELAY_HOST_ID_FILE = "phone-relay-host-id.json";
 export const PHONE_RELAY_PHONES_FILE = "phone-relay-phones.json";
 /** The relay admits 32 per host; 20 phones, 2 pairing windows and the live pairing sessions stay under it. */
 export const MAX_RELAY_PHONES = 20;
@@ -85,6 +89,8 @@ export interface PhoneRelayOptions {
   fetchGrant?: (devices: { e2e: number; legacy: number }) => Promise<unknown>;
   streamDeadlines?: E2EOriginDeadlines;
   log?: (line: string) => void;
+  selfHosted?: boolean;
+  relayNodes?: string[];
 }
 
 const sha256Hex = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -113,6 +119,194 @@ export function phoneRelayKey(dataDir: string): KeyPair {
   const key = generateKeyPair();
   writeFileAtomic(file, `${JSON.stringify({ v: 1, privateKey: b64u(key.privateKey) })}\n`, { mode: 0o600 });
   return key;
+}
+
+const signingKeyCache = new Map<string, { key: KeyObject; rawPublic: Buffer }>();
+const hostIdCache = new Map<string, Buffer>();
+
+export function getOrCreateSigningKey(dataDir: string): { key: KeyObject; rawPublic: Buffer } {
+  const cached = signingKeyCache.get(dataDir);
+  if (cached) return cached;
+  const file = join(dataDir, PHONE_RELAY_SELF_HOSTED_KEY_FILE);
+  if (existsSync(file)) {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as { v?: unknown; seed?: unknown };
+    const seed = parsed.v === 1 && typeof parsed.seed === "string" ? fromB64u(parsed.seed) : null;
+    if (!seed || seed.length !== 32) throw new Error(`${file} is not a valid self-hosted relay signing key`);
+    const key = ed25519PrivateKey(seed);
+    const result = { key, rawPublic: ed25519RawPublicKey(key) };
+    signingKeyCache.set(dataDir, result);
+    return result;
+  }
+  const seed = randomBytes(32);
+  writeFileAtomic(file, `${JSON.stringify({ v: 1, seed: b64u(seed) })}\n`, { mode: 0o600 });
+  const key = ed25519PrivateKey(seed);
+  const result = { key, rawPublic: ed25519RawPublicKey(key) };
+  signingKeyCache.set(dataDir, result);
+  return result;
+}
+
+export function getOrCreateHostId(dataDir: string): Buffer {
+  const cached = hostIdCache.get(dataDir);
+  if (cached) return cached;
+  const file = join(dataDir, PHONE_RELAY_HOST_ID_FILE);
+  if (existsSync(file)) {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as { v?: unknown; hostId?: unknown };
+    const raw = parsed.v === 1 && typeof parsed.hostId === "string" ? fromB64u(parsed.hostId) : null;
+    if (!raw || raw.length !== 16) throw new Error(`${file} is not a valid self-hosted relay host ID`);
+    hostIdCache.set(dataDir, raw);
+    return raw;
+  }
+  const hostId = randomBytes(16);
+  writeFileAtomic(file, `${JSON.stringify({ v: 1, hostId: b64u(hostId) })}\n`, { mode: 0o600 });
+  hostIdCache.set(dataDir, hostId);
+  return hostId;
+}
+
+export function printRelayTokenKeys(dataDir: string): string {
+  const { rawPublic } = getOrCreateSigningKey(dataDir);
+  return JSON.stringify({ k1: b64u(rawPublic) });
+}
+
+export function validateRelayNodes(nodes: unknown): string[] {
+  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 4 || !nodes.every(isValidSelfHostedHost)) {
+    throw new Error("self-hosted relay requires 1 to 4 valid relay node hostnames");
+  }
+  return [...nodes];
+}
+
+export interface SelfHostedTokenServiceOptions {
+  onGrant?: (grant: RelayGrant | null) => void;
+  log?: (line: string) => void;
+  now?: () => number;
+}
+
+export interface SelfHostedTokenService {
+  readonly grant: RelayGrant | null;
+  readonly running: boolean;
+  readonly status: { state: string; code: string | null };
+  currentGrant(): RelayGrant;
+  start(): void;
+  stop(): void;
+  refreshNow(): Promise<void> | void;
+}
+
+export function selfHostedTokenService(
+  dataDir: string,
+  relayNodes: string[],
+  options: SelfHostedTokenServiceOptions = {},
+): SelfHostedTokenService {
+  const validatedNodes = validateRelayNodes(relayNodes);
+  const now = options.now ?? Date.now;
+  let running = false;
+  let grant: RelayGrant | null = null;
+  let timer: NodeJS.Timeout | null = null;
+
+  function mint(): RelayGrant {
+    const { key } = getOrCreateSigningKey(dataDir);
+    const hostId = getOrCreateHostId(dataDir);
+    const nowMs = now();
+    const iat = Math.floor(nowMs / 1000);
+    const exp = iat + RELAY_TOKEN_TTL_S;
+    const claims: RelayTokenClaims = {
+      v: 1,
+      kid: "k1",
+      hid: b64u(hostId),
+      iid: "self-hosted",
+      iat,
+      exp,
+    };
+    const token = mintRelayToken(claims, key);
+    const nextGrant: RelayGrant = {
+      token,
+      hostId: b64u(hostId),
+      nodes: validatedNodes,
+      expiresAt: exp * 1000,
+      refreshAfter: nowMs + 60 * 60 * 1000,
+    };
+    grant = nextGrant;
+    return nextGrant;
+  }
+
+  function schedule(g: RelayGrant) {
+    if (timer) clearTimeout(timer);
+    const delay = Math.max(60_000, g.refreshAfter - now());
+    timer = setTimeout(() => {
+      if (!running) return;
+      try {
+        const refreshed = mint();
+        options.onGrant?.(refreshed);
+        schedule(refreshed);
+      } catch (error) {
+        options.log?.(`phone relay: self-hosted token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+        if (running) {
+          timer = setTimeout(() => {
+            if (!running) return;
+            try {
+              const retryRefreshed = mint();
+              options.onGrant?.(retryRefreshed);
+              schedule(retryRefreshed);
+            } catch {}
+          }, 60_000);
+          timer.unref?.();
+        }
+      }
+    }, delay);
+    timer.unref?.();
+  }
+
+  return {
+    get grant() {
+      return grant;
+    },
+    get running() {
+      return running;
+    },
+    get status() {
+      return { state: running ? (grant ? "ready" : "fetching") : "off", code: null };
+    },
+    currentGrant() {
+      if (!grant || grant.expiresAt <= now()) {
+        grant = mint();
+      }
+      return grant;
+    },
+    start() {
+      if (running) return;
+      running = true;
+      const next = mint();
+      options.onGrant?.(next);
+      schedule(next);
+    },
+    stop() {
+      running = false;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      grant = null;
+      options.onGrant?.(null);
+    },
+    refreshNow() {
+      if (!running) return;
+      if (timer) clearTimeout(timer);
+      try {
+        const next = mint();
+        options.onGrant?.(next);
+        schedule(next);
+      } catch (error) {
+        options.log?.(`phone relay: self-hosted token refresh failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+  };
+}
+
+export function initSelfHostedRelay(dataDir: string, relayNodes: string[]): {
+  signingKey: { key: KeyObject; rawPublic: Buffer };
+  hostId: Buffer;
+  service: SelfHostedTokenService;
+} {
+  const signingKey = getOrCreateSigningKey(dataDir);
+  const hostId = getOrCreateHostId(dataDir);
+  const service = selfHostedTokenService(dataDir, relayNodes);
+  return { signingKey, hostId, service };
 }
 
 function readPhones(dataDir: string): Set<string> {
@@ -169,9 +363,19 @@ function offForTunnel(reason: string): PhoneRelay {
 
 const TUNNEL_HELD = "tunnel_held";
 
-/** Null unless OMB_PHONE_RELAY=1, and when it cannot run here: the server works on without it either way. */
+/** Null unless OMB_PHONE_RELAY=1 or self-hosted relay is enabled; and when it cannot run here: the server works on without it either way. */
 export function startPhoneRelay(options: PhoneRelayOptions): PhoneRelay | null {
-  if (options.env[PHONE_RELAY_ENV] !== "1") return null;
+  const isHosted = options.env[PHONE_RELAY_ENV] === "1";
+  const isSelfHosted = options.selfHosted === true
+    || options.env[PHONE_RELAY_SELF_HOSTED_ENV] === "1"
+    || (options.relayNodes !== undefined && options.relayNodes.length > 0)
+    || Boolean(options.env[PHONE_RELAY_NODES_ENV]);
+
+  if (isHosted && isSelfHosted) {
+    throw new Error("both hosted and self-hosted relay are configured; choose one");
+  }
+  if (!isHosted && !isSelfHosted) return null;
+
   const log = options.log ?? ((line: string) => console.log(line));
   if (options.refusal) {
     log(`phone relay: off on ${options.refusal}`);
@@ -179,11 +383,33 @@ export function startPhoneRelay(options: PhoneRelayOptions): PhoneRelay | null {
   }
   const { sessions, dataDir } = options;
   const version = reportableServerVersion();
-  const holder = tunnelHolder(options.env, dataDir);
-  if (holder) {
-    log(`phone relay: off: ${holder}. Use the relay on a machine signed in with \`openmausbot login --relay\`, which holds no tunnel address.`);
-    return offForTunnel(holder);
+
+  let selfHostedNodes: string[] | undefined;
+  if (isSelfHosted) {
+    selfHostedNodes = options.relayNodes;
+    if (!selfHostedNodes && options.env[PHONE_RELAY_NODES_ENV]) {
+      const raw = options.env[PHONE_RELAY_NODES_ENV]!.trim();
+      if (raw.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) selfHostedNodes = parsed.map(String);
+        } catch {}
+      } else {
+        selfHostedNodes = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    }
+    if (!selfHostedNodes || !selfHostedNodes.length) {
+      throw new Error("self-hosted relay requires 1 to 4 valid relay node hostnames");
+    }
+    validateRelayNodes(selfHostedNodes);
+  } else {
+    const holder = tunnelHolder(options.env, dataDir);
+    if (holder) {
+      log(`phone relay: off: ${holder}. Use the relay on a machine signed in with \`openmausbot login --relay\`, which holds no tunnel address.`);
+      return offForTunnel(holder);
+    }
   }
+
   let key: KeyPair;
   try {
     key = phoneRelayKey(dataDir);
@@ -210,7 +436,7 @@ export function startPhoneRelay(options: PhoneRelayOptions): PhoneRelay | null {
 
   const pairing = new AsyncLocalStorage<E2EContext>();
   let relay: RelayClient | null = null;
-  let grantState: PhoneRelayGrantState = "waiting";
+  let grantState: PhoneRelayGrantState = isSelfHosted ? "ok" : "waiting";
   let tunnelReason: string | null = null;
   const baseUrl = relayBaseUrlOverride(options.env.OMB_PHONE_RELAY_URL);
   const descriptor = () => e2e.descriptor(null);
@@ -232,27 +458,35 @@ export function startPhoneRelay(options: PhoneRelayOptions): PhoneRelay | null {
     return client.relayToken(credential, { appVersion: options.version, devices: devicesNow, kind: "server" });
   });
 
-  const tokens = createRelayTokenService({
-    fetchGrant: async () => {
-      try {
-        const grant = await fetchGrant(counts());
-        if (!validRelayGrant(grant)) throw Object.assign(new Error("invalid relay grant"), { code: "invalid_response" });
-        grantState = "ok";
-        return grant;
-      } catch (error) {
-        const failure = error as { code?: unknown; status?: unknown };
-        if (failure.code === TUNNEL_HELD) applyGrant(null);
-        const current = tokens.grant;
-        grantState = failure.code === TUNNEL_HELD ? "tunnel"
-          : failure.code === "relay_unavailable" ? "unavailable"
-          : failure.code === "signed_out" || failure.status === 401 ? "signed-out"
-          : current && current.expiresAt > Date.now() && relay ? "ok" : "failed";
-        throw error;
-      }
-    },
-    onGrant: (grant) => applyGrant(grant),
-    log: (line) => log(`phone relay: ${line}`),
-  });
+  const tokens = isSelfHosted
+    ? selfHostedTokenService(dataDir, selfHostedNodes!, {
+        onGrant: (grant) => {
+          grantState = grant ? "ok" : "failed";
+          applyGrant(grant);
+        },
+        log: (line) => log(`phone relay: ${line}`),
+      })
+    : createRelayTokenService({
+        fetchGrant: async () => {
+          try {
+            const grant = await fetchGrant(counts());
+            if (!validRelayGrant(grant)) throw Object.assign(new Error("invalid relay grant"), { code: "invalid_response" });
+            grantState = "ok";
+            return grant;
+          } catch (error) {
+            const failure = error as { code?: unknown; status?: unknown };
+            if (failure.code === TUNNEL_HELD) applyGrant(null);
+            const current = tokens.grant;
+            grantState = failure.code === TUNNEL_HELD ? "tunnel"
+              : failure.code === "relay_unavailable" ? "unavailable"
+              : failure.code === "signed_out" || failure.status === 401 ? "signed-out"
+              : current && current.expiresAt > Date.now() && relay ? "ok" : "failed";
+            throw error;
+          }
+        },
+        onGrant: (grant) => applyGrant(grant),
+        log: (line) => log(`phone relay: ${line}`),
+      });
 
   const origin = createE2EOrigin((req, res) => relayed(req, res), (_req, socket) => refuseUpgrade(socket), options.streamDeadlines ?? STREAM_DEADLINES);
 

@@ -69,7 +69,7 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 export interface CliOptions {
-  command: "setup" | "start" | "serve" | "pair" | "sessions" | "status" | "login" | "logout" | "access" | "service" | "browser" | "fleet" | "help" | "version";
+  command: "setup" | "start" | "serve" | "pair" | "sessions" | "status" | "login" | "logout" | "access" | "service" | "browser" | "fleet" | "help" | "version" | "relay-token-keys" | "relay-keys";
   port: number;
   dataDir: string;
   label?: string;
@@ -79,6 +79,8 @@ export interface CliOptions {
   tailscale: boolean;
   tunnel: boolean;
   relay?: boolean;
+  relaySelfHosted?: boolean;
+  relayNodes?: string[];
   /** `serve --lan`: every private address of this machine, plain http, each connection held to private ends. */
   lan?: boolean;
   client: boolean;
@@ -121,7 +123,7 @@ export interface CliOptions {
   pairTtlMs?: number;
 }
 
-const COMMANDS = ["setup", "start", "serve", "pair", "sessions", "devices", "status", "login", "logout", "access", "service", "browser", "fleet", "help", "--help", "-h", "--version", "-v", "version"];
+const COMMANDS = ["setup", "start", "serve", "pair", "sessions", "devices", "status", "login", "logout", "access", "service", "browser", "fleet", "help", "--help", "-h", "--version", "-v", "version", "relay-token-keys", "relay-keys"];
 
 export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env): CliOptions | { error: string } {
   const implicitStart = !argv.length || (argv[0]!.startsWith("--") && argv[0] !== "--help" && argv[0] !== "--version");
@@ -162,6 +164,8 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
         options.domain = domain;
       }
       else if (arg === "--tunnel" || arg === "--relay") options[arg === "--tunnel" ? "tunnel" : "relay"] = true;
+      else if (arg === "--relay-self-hosted") options.relaySelfHosted = true;
+      else if (arg === "--relay-node") { options.relaySelfHosted = true; options.relayNodes = [...(options.relayNodes ?? []), value()]; }
       else if (arg === "--client" || (options.command === "pair" && arg === "--chat-only")) options.client = true;
       // Which phone will scan; only Android needs a different QR. `pair --phone` alone is a chat-only code for any phone.
       else if (arg === "--phone") {
@@ -211,11 +215,14 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
   if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65_535) return { error: "--port must be 1-65535" };
   const publicUrlRefusal = options.publicUrl ? publicUrlProblem(options.publicUrl) : null;
   if (publicUrlRefusal) return { error: publicUrlRefusal };
-  if (options.tunnel && (options.tailscale || options.relay)) return { error: options.relay ? "choose one of --relay (phones through MausBot Relay) and --tunnel (a public address)" : "choose one of --tailscale (your tailnet) and --tunnel (a public address)" };
+  const isSelfHosted = options.relaySelfHosted || Boolean(options.relayNodes?.length);
+  if (isSelfHosted) options.relaySelfHosted = true;
+  if (options.relay && isSelfHosted) return { error: "choose one of --relay (hosted MausBot Relay) and --relay-self-hosted (self-hosted relay)" };
+  if (options.tunnel && (options.tailscale || options.relay || isSelfHosted)) return { error: options.relay ? "choose one of --relay (phones through MausBot Relay) and --tunnel (a public address)" : isSelfHosted ? "choose one of --relay-self-hosted (phones through self-hosted relay) and --tunnel (a public address)" : "choose one of --tailscale (your tailnet) and --tunnel (a public address)" };
   if (options.command === "access" && !options.accessAction) return { error: "access needs one of: list, add EMAIL [--chat-only], remove EMAIL" };
   if (options.command === "service" && !options.serviceAction) return { error: "service needs one of: install [the same options as serve], uninstall" };
   if (options.domain && (options.tailscale || options.tunnel || options.publicUrl)) return { error: "--domain already gives the server its address; drop --tailscale, --tunnel and --public-url" };
-  if (options.local && (options.tailscale || options.tunnel || options.publicUrl || options.lan || options.relay)) return { error: "--local cannot be combined with a remote-access option" };
+  if (options.local && (options.tailscale || options.tunnel || options.publicUrl || options.lan || options.relay || isSelfHosted)) return { error: "--local cannot be combined with a remote-access option" };
   if (options.command === "browser" && !options.browserAction) return { error: "browser needs an action: install or status" };
   if (options.command === "fleet") {
     if (!options.fleetAction) return { error: "fleet needs one of: init --domain HOST [--operator USER], create NAME --admin EMAIL, list, users NAME add|remove EMAIL, suspend NAME, resume NAME, delete NAME --yes, upgrade, agent" };
@@ -713,6 +720,7 @@ export async function runServe(options: CliOptions, log: (line: string) => void 
     OMB_DATA_DIR: options.dataDir,
     OMB_PORT: String(options.port),
     OMB_WEBHOOK_PORT: process.env.OMB_WEBHOOK_PORT || String(options.port + 1), ...(options.relay ? { OMB_PHONE_RELAY: "1" } : {}),
+    ...(options.relaySelfHosted ? { OMB_PHONE_RELAY_SELF_HOSTED: "1" } : {}), ...(options.relayNodes?.length ? { OMB_PHONE_RELAY_NODES: options.relayNodes.join(",") } : {}),
   };
   if (options.local) delete env.OMB_PUBLIC_URL;
   // The per-launch secret goes over stdin, not the environment that every engine the server starts inherits.
@@ -1019,25 +1027,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         return 0;
       }
       return runFleetCommand({
-        action: options.fleetAction as FleetInput["action"],
-        slug: options.slug,
-        domain: options.domain,
-        operator: options.operator ?? process.env.SUDO_USER,
-        admins: options.admins ?? [],
-        members: options.members ?? [],
-        brandFile: options.brandFile,
-        anthropicKeyFile: options.anthropicKeyFile,
-        cap: options.cap,
-        licenseKey: options.licenseKey ?? process.env.OMB_LICENSE_KEY,
-        memory: options.memory,
-        dryRun: options.dryRun ?? false,
-        yes: options.yes ?? false,
-        keepData: options.keepData ?? false,
-        userAction: options.fleetUserAction,
-        email: options.email,
-        chatOnly: options.chatOnly,
-        node: process.execPath,
-        script: process.argv[1] ?? "",
+        action: options.fleetAction as FleetInput["action"], slug: options.slug, domain: options.domain, operator: options.operator ?? process.env.SUDO_USER,
+        admins: options.admins ?? [], members: options.members ?? [], brandFile: options.brandFile, anthropicKeyFile: options.anthropicKeyFile,
+        cap: options.cap, licenseKey: options.licenseKey ?? process.env.OMB_LICENSE_KEY, memory: options.memory, dryRun: options.dryRun ?? false,
+        yes: options.yes ?? false, keepData: options.keepData ?? false, userAction: options.fleetUserAction, email: options.email,
+        chatOnly: options.chatOnly, node: process.execPath, script: process.argv[1] ?? "",
       }, { log: (line) => console.log(line), error: (line) => console.error(line) });
     case "logout":
       return runLogout(options);
@@ -1046,6 +1040,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return 0;
     case "browser":
       return runBrowser(options);
+    case "relay-token-keys":
+    case "relay-keys":
+      console.log((await import("./phone-relay.ts")).printRelayTokenKeys(options.dataDir));
+      return 0;
     default:
       console.log(usage(cliPrefix()));
       return 0;

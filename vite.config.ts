@@ -42,6 +42,7 @@ const include = [
   "connector/**/*.test.ts",
   "scripts/**/*.test.mjs",
   "scripts/**/*.test.ts",
+  "test/**/*.test.ts",
 ];
 
 export default defineConfig({

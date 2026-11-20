@@ -413,6 +413,7 @@ const appConfigSchema = z.object({
   browserEngine: browserEngineConfigSchema.optional(),
   browserProfiles: browserProfilesSchema.optional(),
   instances: instanceConfigMapSchema.optional(),
+  relayNodes: z.array(z.string()).min(1).max(4).optional(),
   /** Loose on purpose: one bad server entry is skipped later, never fails the whole file. */
   mcpServers: z.record(z.string(), z.unknown()).optional(),
 });
@@ -488,6 +489,7 @@ export interface AppConfig extends HelperConfig {
   browserProfiles?: BrowserProfile[];
   browserEngine?: BrowserEngineConfig;
   instances?: InstanceConfigMap;
+  relayNodes?: string[];
 }
 export type BrowserProfile = z.output<typeof browserProfileSchema> & {
   partitionId?: string;
@@ -743,32 +745,30 @@ export function loadConfig(): AppConfig {
   cfg.openrouter = { ...cfg.openrouter };
   if (process.env.OMB_OPENROUTER_API_KEY !== undefined) cfg.openrouter.key = process.env.OMB_OPENROUTER_API_KEY;
   cfg.openaiCompat = { ...cfg.openaiCompat };
-  if (process.env.OPENAI_COMPAT_API_KEY !== undefined) cfg.openaiCompat.key = process.env.OPENAI_COMPAT_API_KEY;
-  if (process.env.OPENAI_COMPAT_URL !== undefined) cfg.openaiCompat.url = process.env.OPENAI_COMPAT_URL;
-  if (process.env.OPENAI_COMPAT_MODEL !== undefined) cfg.openaiCompat.model = process.env.OPENAI_COMPAT_MODEL;
-  if (process.env.OPENAI_COMPAT_PROVIDER !== undefined) cfg.openaiCompat.provider = process.env.OPENAI_COMPAT_PROVIDER;
+  if (process.env.OPENAI_COMPAT_API_KEY !== undefined) cfg.openaiCompat.key = process.env.OPENAI_COMPAT_API_KEY; if (process.env.OPENAI_COMPAT_URL !== undefined) cfg.openaiCompat.url = process.env.OPENAI_COMPAT_URL;
+  if (process.env.OPENAI_COMPAT_MODEL !== undefined) cfg.openaiCompat.model = process.env.OPENAI_COMPAT_MODEL; if (process.env.OPENAI_COMPAT_PROVIDER !== undefined) cfg.openaiCompat.provider = process.env.OPENAI_COMPAT_PROVIDER;
   cfg.composio = { ...cfg.composio };
-  if (process.env.COMPOSIO_API_KEY !== undefined) cfg.composio.apiKey = process.env.COMPOSIO_API_KEY;
-  cfg.box = { ...cfg.box };
-  if (process.env.BOX_TOKEN !== undefined) cfg.box.token = process.env.BOX_TOKEN;
-  cfg.opencodeGo = { ...cfg.opencodeGo };
-  if (process.env.OPENCODE_API_KEY !== undefined) cfg.opencodeGo.apiKey = process.env.OPENCODE_API_KEY;
+  if (process.env.COMPOSIO_API_KEY !== undefined) cfg.composio.apiKey = process.env.COMPOSIO_API_KEY; if (process.env.BOX_TOKEN !== undefined) cfg.box = { ...cfg.box, token: process.env.BOX_TOKEN };
+  cfg.opencodeGo = { ...cfg.opencodeGo }; if (process.env.OPENCODE_API_KEY !== undefined) cfg.opencodeGo.apiKey = process.env.OPENCODE_API_KEY;
   cfg.tts = { ...cfg.tts };
-  if (process.env.OMB_TTS_KEY !== undefined) cfg.tts.key = process.env.OMB_TTS_KEY;
+  if (process.env.OMB_TTS_KEY !== undefined) cfg.tts.key = process.env.OMB_TTS_KEY; if (process.env.OMB_FISH_AUDIO_API_KEY !== undefined) cfg.tts.fishKey = process.env.OMB_FISH_AUDIO_API_KEY;
+  if (process.env.OMB_GEMINI_API_KEY !== undefined) cfg.tts.geminiKey = process.env.OMB_GEMINI_API_KEY;
   const presetVoice = process.env.OMB_TTS_DEFAULT_VOICE?.trim();
   if (presetVoice && !cfg.tts.voice?.trim() && (cfg.tts.provider ?? "elevenlabs") === "elevenlabs") cfg.tts.voice = presetVoice;
-  if (process.env.OMB_FISH_AUDIO_API_KEY !== undefined) cfg.tts.fishKey = process.env.OMB_FISH_AUDIO_API_KEY;
-  if (process.env.OMB_GEMINI_API_KEY !== undefined) cfg.tts.geminiKey = process.env.OMB_GEMINI_API_KEY;
   cfg.decider = { ...cfg.decider };
   if (process.env.OMB_JEV_API_KEY !== undefined) cfg.decider.key = process.env.OMB_JEV_API_KEY; if (process.env.OMB_CUSTOM_DECIDER_KEY !== undefined) cfg.decider.customKey = process.env.OMB_CUSTOM_DECIDER_KEY;
   if (process.env.OMB_OPENROUTER_DECIDER_KEY !== undefined) cfg.decider.openrouterKey = process.env.OMB_OPENROUTER_DECIDER_KEY; if (process.env.OMB_WORKERS_AI_TOKEN !== undefined) cfg.decider.workersAiToken = process.env.OMB_WORKERS_AI_TOKEN;
   cfg.live = liveConfigWithEnv(cfg.live); fishKeyFromLiveKey(cfg);
   cfg.imageGen = { ...cfg.imageGen };
-  if (process.env.OMB_OPENAI_IMAGE_KEY !== undefined) cfg.imageGen.key = process.env.OMB_OPENAI_IMAGE_KEY;
-  if (process.env.OMB_CUSTOM_IMAGE_KEY !== undefined) cfg.imageGen.customApiKey = process.env.OMB_CUSTOM_IMAGE_KEY;
+  if (process.env.OMB_OPENAI_IMAGE_KEY !== undefined) cfg.imageGen.key = process.env.OMB_OPENAI_IMAGE_KEY; if (process.env.OMB_CUSTOM_IMAGE_KEY !== undefined) cfg.imageGen.customApiKey = process.env.OMB_CUSTOM_IMAGE_KEY;
   if (process.env.OMB_GEMINI_IMAGE_KEY !== undefined) cfg.imageGen.geminiKey = process.env.OMB_GEMINI_IMAGE_KEY;
   const signInEnv = signInFromEnv();
   if (signInEnv.admins || signInEnv.members) cfg.signIn = { ...cfg.signIn, ...signInEnv };
+  if (process.env.OMB_PHONE_RELAY_NODES !== undefined) {
+    const raw = process.env.OMB_PHONE_RELAY_NODES.trim();
+    try { const p = raw.startsWith("[") ? JSON.parse(raw) : null; if (Array.isArray(p)) cfg.relayNodes = p.map(String); } catch {}
+    if (!cfg.relayNodes) cfg.relayNodes = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
   return cfg;
 }
 

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../core/e2e/descriptor.dart';
+
 class CompanionEndpoint {
   final String url;
   final String kind;
@@ -44,6 +46,7 @@ class PairingPayload {
   final String? code;
   final String machineName;
   final List<CompanionEndpoint> endpoints;
+  final E2EDescriptor? e2e;
 
   PairingPayload({
     required this.host,
@@ -53,6 +56,7 @@ class PairingPayload {
     this.code,
     required this.machineName,
     List<CompanionEndpoint>? endpoints,
+    this.e2e,
   }) : endpoints = endpoints ?? const [];
 
   /// Legacy alias used by older fixtures and QR JSON.
@@ -77,6 +81,10 @@ class PairingPayload {
     final code = data['code'] as String?;
     final endpoints = _endpointsFromJson(data['endpoints']) ??
         _endpointsFromLegacy(host: host, port: port, remoteUrl: remoteUrl);
+    final e2eRaw = data['e2e'];
+    final e2e = e2eRaw != null
+        ? E2EDescriptor.parse(e2eRaw is Map ? Map<String, dynamic>.from(e2eRaw) : e2eRaw)
+        : null;
     return PairingPayload(
       host: host,
       port: port,
@@ -87,6 +95,7 @@ class PairingPayload {
           data['name'] as String? ??
           'OpenMausBot Desktop',
       endpoints: endpoints,
+      e2e: e2e,
     );
   }
 
@@ -137,6 +146,11 @@ class PairingPayload {
             hosts: hosts,
           );
 
+    final e2eParam = uri.queryParameters['e2e'];
+    final e2e = e2eParam != null && e2eParam.isNotEmpty
+        ? E2EDescriptor.parse(e2eParam)
+        : null;
+
     return PairingPayload(
       host: host,
       port: port,
@@ -145,6 +159,7 @@ class PairingPayload {
       code: code,
       machineName: name,
       endpoints: endpoints,
+      e2e: e2e,
     );
   }
 
@@ -158,6 +173,7 @@ class PairingPayload {
       if (code != null) 'code': code,
       'machineName': machineName,
       'endpoints': endpoints.map((endpoint) => endpoint.toJson()).toList(),
+      if (e2e != null) 'e2e': e2e!.toJson(),
     };
   }
 
@@ -275,18 +291,20 @@ class PairResult {
   final String serverName;
   final String? deviceId;
   final List<CompanionEndpoint> endpoints;
+  final E2EDescriptor? e2e;
 
   const PairResult({
     required this.token,
     required this.serverName,
     this.deviceId,
     this.endpoints = const [],
+    this.e2e,
   });
 
-  factory PairResult.fromJson(Map<String, dynamic> json) {
+  factory PairResult.fromJson(Map<String, dynamic> json, [E2EDescriptor? e2e]) {
     final token = json['token'] as String?;
     if (token == null || token.isEmpty) {
-      throw FormatException('pair response missing token');
+      throw const FormatException('pair response missing token');
     }
     final device = json['device'];
     return PairResult(
@@ -294,6 +312,7 @@ class PairResult {
       serverName: json['serverName'] as String? ?? 'OpenMausBot',
       deviceId: device is Map ? device['id'] as String? : null,
       endpoints: PairingPayload._endpointsFromJson(json['endpoints']) ?? const [],
+      e2e: e2e,
     );
   }
 }

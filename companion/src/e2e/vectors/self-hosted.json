@@ -1,0 +1,101 @@
+{
+  "about": "Test vectors for self-hosted relay hostname validation (companion/src/e2e/README.md).",
+  "hosts": [
+    {
+      "host": "relay.example.com",
+      "valid": true
+    },
+    {
+      "host": "my-relay.domain.co.uk",
+      "valid": true
+    },
+    {
+      "host": "node-1.vps.net",
+      "valid": true
+    },
+    {
+      "host": "relay1.openmausbot.com",
+      "valid": true
+    },
+    {
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+      "valid": true
+    },
+    {
+      "host": "wss://relay.example.com",
+      "valid": false
+    },
+    {
+      "host": "http://relay.example.com",
+      "valid": false
+    },
+    {
+      "host": "https://relay.example.com",
+      "valid": false
+    },
+    {
+      "host": "relay.example.com:8080",
+      "valid": false
+    },
+    {
+      "host": "relay.example.com:443",
+      "valid": false
+    },
+    {
+      "host": "relay.example.com/v1",
+      "valid": false
+    },
+    {
+      "host": "relay.example.com/",
+      "valid": false
+    },
+    {
+      "host": "127.0.0.1",
+      "valid": false
+    },
+    {
+      "host": "[::1]",
+      "valid": false
+    },
+    {
+      "host": "192.168.1.1",
+      "valid": false
+    },
+    {
+      "host": "::1",
+      "valid": false
+    },
+    {
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.example.com",
+      "valid": false
+    },
+    {
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "valid": false
+    },
+    {
+      "host": "",
+      "valid": false
+    },
+    {
+      "host": "localhost",
+      "valid": false
+    },
+    {
+      "host": "-relay.example.com",
+      "valid": false
+    },
+    {
+      "host": "relay-.example.com",
+      "valid": false
+    },
+    {
+      "host": "relay..example.com",
+      "valid": false
+    },
+    {
+      "host": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+      "valid": false
+    }
+  ]
+}

@@ -1,16 +1,27 @@
 import { isIPv4, isIPv6 } from "node:net";
 
-/** Caddy runs on the same host and is the only peer allowed to name the client in X-Forwarded-For. */
+/** Caddy or cloudflared runs on the same host and is the only peer allowed to name the client in proxy headers. */
 const TRUSTED_PROXY = new Set(["127.0.0.1", "::ffff:127.0.0.1"]);
 
 /**
- * The key a client's per-IP limits are counted under, or undefined when a trusted proxy sent an X-Forwarded-For that is
- * not an address. The last entry is the one the proxy itself appended, so earlier entries a client wrote are ignored.
- * Anyone but the proxy is counted by its own address and its X-Forwarded-For is ignored.
+ * The key a client's per-IP limits are counted under, or undefined when a trusted proxy sent a header that is not an
+ * address. Cf-Connecting-IP takes precedence behind the proxy. The last X-Forwarded-For entry is the one the proxy
+ * itself appended, so earlier entries a client wrote are ignored. Anyone but the proxy is counted by its own address.
  */
-export function clientKey(remoteAddress: string | undefined, forwardedFor: string | string[] | undefined): string | undefined {
+export function clientKey(
+  remoteAddress: string | undefined,
+  forwardedFor: string | string[] | undefined,
+  cfConnectingIp?: string | string[] | undefined,
+): string | undefined {
   if (!remoteAddress) return undefined;
   if (!TRUSTED_PROXY.has(remoteAddress)) return addressKey(remoteAddress);
+
+  if (cfConnectingIp !== undefined) {
+    const raw = Array.isArray(cfConnectingIp) ? cfConnectingIp[0] : cfConnectingIp;
+    const ip = raw?.trim();
+    if (ip && (isIPv4(ip) || isIPv6(ip))) return addressKey(ip);
+  }
+
   const header = Array.isArray(forwardedFor) ? forwardedFor.join(",") : forwardedFor;
   if (header === undefined) return addressKey(remoteAddress);
   const last = header.slice(header.lastIndexOf(",") + 1).trim();

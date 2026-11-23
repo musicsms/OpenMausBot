@@ -1,0 +1,236 @@
+name: Package macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit/tag/branch to build (defaults to the branch this is run from)"
+        required: false
+        type: string
+      create_release:
+        description: "Create/update a GitHub Release"
+        required: false
+        type: boolean
+        default: true
+      tag:
+        description: "Release tag (leave empty for v<version>-uat)"
+        required: false
+        type: string
+        default: ""
+      title:
+        description: "Release title (leave empty for auto-generated)"
+        required: false
+        type: string
+        default: ""
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: macOS arm64 + x64 (DMG + ZIP)
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3 # v6.0.10
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Clean generated output
+        run: rm -rf dist dist-server dist-native release
+
+      - name: Check signing certificate
+        id: cert
+        env:
+          MAC_CERT: ${{ secrets.MAC_CERT_P12_BASE64 }}
+        run: |
+          if [ -n "$MAC_CERT" ]; then
+            echo "has_cert=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_cert=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import Developer ID certificate if available
+        if: steps.cert.outputs.has_cert == 'true'
+        env:
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$MAC_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MAC_CERT_PASSWORD" -A \
+            -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Package both architectures
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          HAS_CERT: ${{ steps.cert.outputs.has_cert }}
+        run: |
+          if [ "$HAS_CERT" = "true" ]; then
+            pnpm package:mac
+          else
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            pnpm package:prepare
+            pnpm build:speech
+            pnpm build:cua
+            pnpm exec electron-builder --mac --publish never -c.mac.identity="-" -c.dmg.sign=false
+          fi
+
+      - name: Gate - packaged server starts and helper paths resolve
+        run: |
+          for app in release/mac-arm64/OpenMausBot.app release/mac/OpenMausBot.app; do
+            res="$app/Contents/Resources"
+            OMB_SMOKE_DIST="$res/server" node scripts/smoke-packaged-server.mjs \
+              || { echo "::error::packaged server in $app failed to start"; exit 1; }
+            node scripts/check-module-scopes.mjs "$res" || exit 1
+            node --input-type=module - "$res/server" <<'EOF'
+          import { existsSync } from "node:fs";
+          import { pathToFileURL } from "node:url";
+          const server = process.argv[2];
+          const { SPAWNED_PROXIES } = await import(pathToFileURL(`${server}/proxy-paths.js`));
+          const missing = Object.entries(SPAWNED_PROXIES).filter(([, p]) => !existsSync(p));
+          if (missing.length) {
+            console.error("unresolved proxies:", missing);
+            process.exit(1);
+          }
+          console.log(`ok: ${Object.keys(SPAWNED_PROXIES).length} proxies resolve in ${server}`);
+          EOF
+            speech="$res/OpenMausBot Speech.app/Contents/MacOS/speech-helper"
+            lipo -archs "$speech" | grep -q "x86_64" || { echo "::error::$speech lacks x86_64"; exit 1; }
+            lipo -archs "$speech" | grep -q "arm64" || { echo "::error::$speech lacks arm64"; exit 1; }
+            expected_arch=x86_64
+            case "$app" in *mac-arm64*) expected_arch=arm64 ;; esac
+            cloudflared="$res/cloudflared/cloudflared"
+            for bin in "$res/cua-driver" "$res/cua-sdk/native/libcua_driver_sdk.dylib" \
+              "$res/cua-sdk/native/cua_driver_node_runtime.node" "$res/android-platform-tools/darwin/adb" "$cloudflared"; do
+              test "$(lipo -archs "$bin")" = "$expected_arch" || {
+                echo "::error::$bin is not the expected $expected_arch executable"; exit 1; }
+            done
+          done
+
+      - name: Gate - native browser works on runner architecture
+        run: |
+          case "$(uname -m)" in
+            arm64) resources="$PWD/release/mac-arm64/OpenMausBot.app/Contents/Resources" ;;
+            x86_64) resources="$PWD/release/mac/OpenMausBot.app/Contents/Resources" ;;
+            *) exit 1 ;;
+          esac
+          node scripts/smoke-browser-bundle.mjs --resources "$resources"
+          OMB_SMOKE_DIST="$resources/server" node scripts/smoke-packaged-server.mjs --browser-bundle "$resources/browser-engine"
+
+      - name: Prepare release assets
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          tag="${{ inputs.tag }}"
+          if [ -z "$tag" ]; then
+            tag="v${version}-uat"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          title="${{ inputs.title }}"
+          if [ -z "$title" ]; then
+            title="OpenMausBot v${version} (macOS Preview)"
+          fi
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+          (
+            cd release
+            shasum -a 256 OpenMausBot-*.dmg OpenMausBot-*.zip > SHA256SUMS-macos.txt
+          )
+          echo "artifact-name=openmausbot-macos-${version}" >> "$GITHUB_OUTPUT"
+          echo "Generated SHA256SUMS-macos.txt:"
+          cat release/SHA256SUMS-macos.txt
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.assets.outputs.artifact-name }}
+          path: |
+            release/OpenMausBot-*.dmg
+            release/OpenMausBot-*.zip
+            release/SHA256SUMS-macos.txt
+            release/latest-mac.yml
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.create_release != false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.assets.outputs.tag }}
+          TITLE: ${{ steps.assets.outputs.title }}
+          VERSION: ${{ steps.assets.outputs.version }}
+          IS_PRERELEASE: ${{ inputs.prerelease != false }}
+        run: |
+          set -euo pipefail
+
+          prerelease_flag=""
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          cat << EOF > /tmp/release-notes.md
+## OpenMausBot macOS Build (v${VERSION})
+
+Desktop application for macOS (Apple Silicon and Intel).
+
+### Downloads
+- **Apple Silicon (M1 / M2 / M3 / M4)**: \`OpenMausBot-${VERSION}-arm64.dmg\`
+- **Intel**: \`OpenMausBot-${VERSION}-x64.dmg\`
+- Checksums: \`SHA256SUMS-macos.txt\`
+
+### Installation on macOS
+1. Download the \`.dmg\` matching your Mac processor.
+2. Open the \`.dmg\` and drag **OpenMausBot** into **/Applications**.
+3. Because this is an ad-hoc signed community build, macOS Gatekeeper may display *"OpenMausBot is damaged and cannot be opened"* or block execution.
+   To allow it to run, execute in Terminal:
+   \`\`\`bash
+   xattr -cr /Applications/OpenMausBot.app
+   \`\`\`
+   Or: Right-click (Control-click) **OpenMausBot.app** in \`/Applications\` -> choose **Open** -> click **Open**.
+EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, uploading assets..."
+            gh release upload "$TAG" \
+              release/OpenMausBot-*.dmg \
+              release/OpenMausBot-*.zip \
+              release/SHA256SUMS-macos.txt \
+              --clobber
+          else
+            echo "Creating release $TAG..."
+            gh release create "$TAG" \
+              release/OpenMausBot-*.dmg \
+              release/OpenMausBot-*.zip \
+              release/SHA256SUMS-macos.txt \
+              --title "$TITLE" \
+              --notes-file /tmp/release-notes.md \
+              $prerelease_flag
+          fi

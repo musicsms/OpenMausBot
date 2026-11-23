@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AppConfig } from "../config.ts";
 import { flushDecisionLog, readDecisions } from "../decision-log.ts";
 import { UNDO_STALE } from "../direct-apply.ts";
+import type { TurnOwnerRefusal } from "../host/phones.ts";
 import type { BotRecord } from "../store.ts";
 import { createAppSettings, WRITE_BUDGET } from "./host.ts";
 import { createSettingsRegistry } from "./registry.ts";
@@ -18,7 +19,7 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 });
 
-function fixture(options: { owner?: boolean; guest?: boolean; group?: boolean; window?: boolean; pictureRefusal?: string; patchRefusal?: string } = {}) {
+function fixture(options: { owner?: boolean; ownerRefusal?: TurnOwnerRefusal; guest?: boolean; group?: boolean; window?: boolean; pictureRefusal?: string; patchRefusal?: string; automated?: boolean } = {}) {
   const dataDir = mkdtempSync(join(tmpdir(), "app-settings-"));
   dirs.push(dataDir);
   const bots: BotRecord[] = [
@@ -85,7 +86,9 @@ function fixture(options: { owner?: boolean; guest?: boolean; group?: boolean; w
   const host = createAppSettings({
     store: store as never, dataDir, entries,
     turnOwner: () => (options.owner === false ? null : "owner"),
+    ownerRefusal: () => (options.owner === false ? (options.ownerRefusal ?? null) : null),
     guestDriven: () => options.guest === true,
+    automated: () => options.automated === true,
     requestCredential: async (_bot, _threadId, body) => { credentialCards.push(body); return { status: 201, body: { messageId: "secret-1", label: "OpenAI API key" } }; },
     connectorThread: () => ({ group: options.group ? { id: "g", name: "Room" } as never : undefined }),
     language: () => undefined,
@@ -110,9 +113,32 @@ describe("reads", () => {
     const { host, turn } = fixture();
     const found = await host.handle({ action: "find", query: "dark mode" }, turn);
     const hits = JSON.parse(String(found.body.text)) as Array<Record<string, unknown>>;
-    expect(hits[0]).toMatchObject({ id: "appearance.skin", tier: "safe", value: "daylight", where: "Settings → Appearance" });
+    expect(hits[0]).toMatchObject({ id: "appearance.skin", tier: "safe", value: "daylight", where: "Settings → Appearance → Theme" });
     const got = await host.handle({ action: "get", id: "rooms.turnTimeoutMinutes" }, turn);
     expect(JSON.parse(String(got.body.text))).toMatchObject({ id: "rooms.turnTimeoutMinutes", value: "30", allowed: "1 to 1440 minutes", change: "set applies at once, with Undo on the card" });
+  });
+
+  it("names the per-bot connected apps switch as the bot panel does, so find reaches it by those words", async () => {
+    const { host, turn } = fixture();
+    const found = JSON.parse(String((await host.handle({ action: "find", query: "connected apps" }, turn)).body.text)) as Array<{ id: string }>;
+    expect(found.map((hit) => hit.id)).toContain("bots.settings");
+    const got = JSON.parse(String((await host.handle({ action: "get", id: "bots.settings" }, turn)).body.text)) as { help: string };
+    expect(got.help).toContain("connected apps");
+    expect(got.help).not.toContain("Composio apps");
+  });
+
+  it("names real places only: find falls back to where a thing is, places lists them all", async () => {
+    const { host, turn } = fixture();
+    const owner = await host.handle({ action: "get", id: "phone.pairing" }, turn);
+    expect(JSON.parse(String(owner.body.text))).toMatchObject({ where: "Settings → Phone & devices → Pair a phone", change: "only the person, in Settings → Phone & devices → Pair a phone" });
+    const none = await host.handle({ action: "find", query: "invoice" }, turn);
+    expect(none.body.text).toMatch(/^No setting you can change matches "invoice"\. Where the person finds it in the app: Settings → Plan & billing/);
+    expect((await host.handle({ action: "places", query: "spending" }, turn)).body.text).toMatch(/^Settings → Spending$/m);
+    expect((await host.handle({ action: "places", query: "storage" }, turn)).body.text).toMatch(/^Settings → Data.*\(shown in Advanced mode only/m);
+    const every = String((await host.handle({ action: "places" }, turn)).body.text).split("\n");
+    expect(every[0]).toMatch(/^Settings opens from/);
+    expect(every).toContain("Settings → AI → Other services");
+    expect(every.join("\n")).not.toMatch(/API keys|Computers\b/);
   });
 
   it("works in a turn that is not the owner's, where writes are refused", async () => {
@@ -122,6 +148,31 @@ describe("reads", () => {
     expect(refused.status).toBe(403);
     expect(refused.body.error).toContain("owner's own conversation");
     expect(saved).toEqual([]);
+  });
+
+  it("says why a turn is not the owner's own and what the person can do instead, and still changes nothing", async () => {
+    const said = async (options: Parameters<typeof fixture>[0]) => {
+      const { host, turn, set, saved } = fixture(options);
+      const where = (JSON.parse(String((await host.handle({ action: "get", id: "general.language" }, turn)).body.text)) as { where: string }).where;
+      const refused = await set("general.language", "de");
+      expect(refused.status).toBe(403);
+      expect(saved).toEqual([]);
+      const error = String(refused.body.error);
+      expect(error).toMatch(/^Settings change only in the owner's own conversation\. Nothing changed; you may still read settings\. /);
+      expect(error).toContain(`The person can change it themselves in ${where}.`);
+      return error;
+    };
+    expect(await said({ owner: false, ownerRefusal: "shared" })).toContain("Several people share this server");
+    expect(await said({ owner: false, ownerRefusal: "service" })).toContain("set up as a shared or hosted server");
+    expect(await said({ guest: true })).toContain("A guest writes in this conversation");
+    const someoneElse = await said({ owner: false, ownerRefusal: "someone-else" });
+    expect(someoneElse).toContain("asking again here won't work");
+    expect(someoneElse).toContain("a new conversation with this bot that only they write in");
+    expect(await said({ owner: false, ownerRefusal: "not-owner" })).toContain("started by someone other than the owner");
+    expect(await said({ owner: false, ownerRefusal: "memory-changed" })).toContain("tap Mark reviewed");
+    expect(await said({ owner: false, ownerRefusal: "unproven" })).toContain("can't be tied to a message the owner sent here");
+    // No reason given: the plain words, still refused.
+    expect(await said({ owner: false })).toContain("can't be tied to a message the owner sent here");
   });
 
   it("refuses writes in a guest-driven conversation", async () => {
@@ -255,6 +306,18 @@ describe("AI engines", () => {
     expect(fx.engines.map((engine) => engine.instanceId)).toEqual(["claude", "openai-compat-gw"]);
   });
 
+  it("refuses a local server already added at the same address, so Settings never lists it twice", async () => {
+    const fx = fixture();
+    await fx.set("engines", JSON.stringify({ kind: "lmstudio", url: "http://127.0.0.1:1234/v1" }));
+    const again = await fx.set("engines", JSON.stringify({ kind: "lmstudio", url: "http://127.0.0.1:1234/v1/" }));
+    expect(again).toMatchObject({ status: 409, body: { error: "\"LM Studio\" at http://127.0.0.1:1234/v1 is already an engine (openai-compat-2). Use that one; do not add it again." } });
+    expect(fx.engineCalls).toHaveLength(1);
+    expect(fx.cards()).toHaveLength(1);
+    // Another address is another server.
+    await fx.set("engines", JSON.stringify({ kind: "lmstudio", url: "http://127.0.0.1:1235/v1" }));
+    expect(fx.engineCalls).toHaveLength(2);
+  });
+
   it("an engine that needs a key takes only a saved key's id, which the server reads as it adds it; the key is shown nowhere", async () => {
     const fx = fixture();
     const missing = await fx.set("engines", JSON.stringify({ kind: "openai-compat", name: "Proxy", url: "https://proxy.example/v1", keyFrom: "mistralApiKey" }));
@@ -275,7 +338,7 @@ describe("AI engines", () => {
   it("never removes an engine: the bot is told in one line that the person does that in Settings", async () => {
     const fx = fixture();
     const refused = await fx.set("engines", JSON.stringify({ kind: "remove", instanceId: "openai-compat-gw" }));
-    expect(refused).toMatchObject({ status: 409, body: { error: "Removing an AI engine is changed only by the person, in Settings → AI. Tell them where in one line; do not try another way." } });
+    expect(refused).toMatchObject({ status: 409, body: { error: "Removing an AI engine is changed only by the person, in Settings → AI → Providers. Tell them where in one line; do not try another way." } });
     expect(fx.engineCalls).toEqual([]);
     expect(fx.cards()).toEqual([]);
   });
@@ -320,7 +383,7 @@ describe("owner-only tier", () => {
     expect(on.body.text).toMatch(/^Done: Let your paired phones reach this computer from anywhere, through MausBot's relay\./);
     expect(fx.windowValues.get("remote.relay")).toBe(true);
     const off = await fx.set("remote.relay", false);
-    expect(off).toMatchObject({ status: 409, body: { error: "Turning off Reach from anywhere is changed only by the person, in Settings → Phone & devices. Tell them where in one line; do not try another way." } });
+    expect(off).toMatchObject({ status: 409, body: { error: "Turning off Reach from anywhere is changed only by the person, in Settings → Phone & devices → How your phone reaches this computer → Anywhere, through MausBot (only in the desktop app, on this computer's own page). Tell them where in one line; do not try another way." } });
     expect(fx.windowValues.get("remote.relay")).toBe(true);
     expect(await fx.undo()).toEqual({ claimed: true, state: "undone" });
     expect(fx.windowValues.get("remote.relay")).toBe(false);
@@ -479,6 +542,19 @@ describe("every other setting applies at once with Undo, Full access or not", ()
     expect(fx.cards()[0]!.card.subtitle).toBe("Kiwi: memory off; computer use this computer's own desktop, as you");
     expect(await fx.undo()).toEqual({ claimed: true, state: "undone" });
     expect(fx.botPatches).toEqual([{ botId: "kiwi", body: { memoryEnabled: false, computer: "local" } }, { botId: "kiwi", body: { memoryEnabled: true, computer: null } }]);
+  });
+
+  it("never keeps a bot on this computer from a routine or other automation, the owner's own included", async () => {
+    const fx = fixture({ automated: true });
+    const refused = await fx.set("bots.settings", JSON.stringify({ botId: "kiwi", computer: "local" }));
+    expect(refused.status).toBe(403);
+    expect(String(refused.body.error)).toContain("A routine or automation can't keep a bot on this computer. Nothing changed");
+    expect(String(refused.body.error)).toContain("This computer under “Where Kiwi works” in Bot's screen");
+    expect(fx.botPatches).toEqual([]);
+    expect(fx.cards()).toEqual([]);
+    // Other settings, and another place, still change from an automation as before.
+    expect((await fx.set("bots.settings", JSON.stringify({ botId: "kiwi", computer: "vm" }))).status).toBe(200);
+    expect(fx.botPatches).toEqual([{ botId: "kiwi", body: { computer: "vm" } }]);
   });
 
   it("turns one bot's tool groups off and on by name, keeps the rest as they were, and Undo puts the list back", async () => {

@@ -16,6 +16,7 @@ import { readHandoffs } from "./testing/handoff-rows.ts";
 import { hostTimeout } from "./testing/host-timeout.ts";
 import { openSse } from "./testing/sse.ts";
 import { withoutTurnClock } from "./testing/turn-clock-text.ts";
+import { readRegistry, writeRegistry } from "./testing/registry.ts";
 
 const count = (text: string, needle: string) => text.split(needle).length - 1;
 
@@ -59,7 +60,7 @@ async function fixture(test: (f: any) => Promise<void>, options: { env?: NodeJS.
         "let botId = null;",
         'try { for (const s of Object.values(JSON.parse(readFileSync(after("--mcp-config"), "utf8")).mcpServers ?? {})) botId = s?.env?.OMB_BOT_ID ?? botId; } catch {}',
         `if (after("--resume") || after("--session-id")) appendFileSync(${JSON.stringify(launchesPath)}, JSON.stringify({ botId, pid: process.pid, resume: after("--resume"), sessionId: after("--session-id"), mode: process.env.FAKE_CLAUDE_MODE ?? "happy" }) + "\\n");`,
-        `else if (argv[0] === "app-server") appendFileSync(${JSON.stringify(codexLaunchesPath)}, JSON.stringify({ botId: process.env.OMB_BOT_ID ?? null }) + "\\n");`,
+        `else if (argv[0] === "app-server") appendFileSync(${JSON.stringify(codexLaunchesPath)}, JSON.stringify({ botId: process.env.OMB_BOT_ID ?? null, pid: process.pid }) + "\\n");`,
         `if (botId) process.env.FAKE_CLAUDE_PROMPTS = ${JSON.stringify(join(dataDir, "consumed-"))} + botId + ".jsonl";`,
         // A warm Claude process ends once idle after its mode changed, like a CLI that exited, so the next turn launches under the new mode.
         ...(name === "claude" ? [
@@ -74,6 +75,21 @@ async function fixture(test: (f: any) => Promise<void>, options: { env?: NodeJS.
           `    if (text.includes('"type":"result"')) idle = true;`,
           "    return write(chunk, ...rest);",
           "  };",
+          '  setInterval(() => { if (idle && modeNow() !== launched) write("", () => process.exit(0)); }, 50).unref();',
+          "}",
+        ] : []),
+        // A kept Codex app-server ends once idle after its mode changed, like one that exited, so the next turn launches under the new mode.
+        ...(name === "codex" ? [
+          'if (argv[0] === "app-server") {',
+          `  const modeNow = () => existsSync(${JSON.stringify(modePath(name))}) ? readFileSync(${JSON.stringify(modePath(name))}, "utf8") : "";`,
+          "  const launched = modeNow();",
+          "  let idle = false;",
+          "  const write = process.stdout.write.bind(process.stdout);",
+          "  process.stdout.write = (chunk, ...rest) => {",
+          `    if (String(chunk).includes('"turn/completed"')) idle = true;`,
+          "    return write(chunk, ...rest);",
+          "  };",
+          `  process.stdin.on("data", (chunk) => { if (String(chunk).includes('"turn/start"')) idle = false; });`,
           '  setInterval(() => { if (idle && modeNow() !== launched) write("", () => process.exit(0)); }, 50).unref();',
           "}",
         ] : []),
@@ -112,7 +128,7 @@ async function fixture(test: (f: any) => Promise<void>, options: { env?: NodeJS.
     const messages = async (threadId = thread) => (await api(`/api/threads/${threadId}/messages`)).messages;
     const nodes = () => readHandoffs(dataDir);
     const root = () => nodes().filter((node: any) => !node.parentId && node.threadId === thread).at(-1);
-    const task = (threadId = thread) => JSON.parse(readFileSync(join(dataDir, "bots.json"), "utf8"))
+    const task = (threadId = thread) => readRegistry(dataDir).bots
       .find((b: any) => b.id === chief.id).tasks.find((stored: any) => stored.threadId === threadId);
     const handed = (threadId = thread) => task(threadId).handedMessages;
     // A person-stopped or failed turn does not settle as "settled" for `wait`.
@@ -141,6 +157,7 @@ async function fixture(test: (f: any) => Promise<void>, options: { env?: NodeJS.
       else rmSync(modePath(engine), { force: true });
       const pid = engine === "claude" ? launches().at(-1)?.pid : undefined;
       if (pid) await expect.poll(() => alive(pid), { timeout: 30_000 }).toBe(false);
+      if (engine === "codex") await expect.poll(() => jsonl(codexLaunchesPath).some((launch: any) => alive(launch.pid)), { timeout: 30_000 }).toBe(false);
     };
     const delegate = (key: string, to: any[], message: string, extra: Record<string, unknown> = {}) =>
       ({ steps: [{ arguments: { bot_ids: to.map((b) => b.id), request_key: key, message } }], reply: "Assigned", resumeReply: "Done", ...extra });
@@ -154,9 +171,9 @@ async function fixture(test: (f: any) => Promise<void>, options: { env?: NodeJS.
     const open = (path: string) => writeFileSync(path, "open");
     const restart = async (edit: (bots: any[]) => void, signal: NodeJS.Signals = "SIGTERM", extraEnv: NodeJS.ProcessEnv = {}) => {
       await waitForExit(restarted ?? session.child, { signal });
-      const bots = JSON.parse(readFileSync(join(dataDir, "bots.json"), "utf8"));
+      const bots = readRegistry(dataDir).bots;
       edit(bots);
-      writeFileSync(join(dataDir, "bots.json"), JSON.stringify(bots, null, 2));
+      writeRegistry(dataDir, { bots });
       const env = { ...verificationServerEnvironment(parentEnv, dataDir, Number(new URL(session.info.url).port)), ...extraEnv };
       const log = openSync(session.info.logPath, "a", 0o600);
       restarted = spawn(process.execPath, ["--experimental-strip-types", fileURLToPath(new URL("./index.ts", import.meta.url))],
@@ -638,6 +655,8 @@ it.each(["SIGTERM", "SIGKILL"] as const)("runs each teammate turn a restart cut 
     // Only a turn's POST carries a body; the Ollama probe GETs /api/version first (ollama-context.ts).
     if (req.method !== "POST") { res.writeHead(404); res.end(); return; }
     for await (const chunk of req) body += chunk;
+    // Naming a work thread a hand-off opened is a one-shot of its own, not a step of any turn here: it gets no title.
+    if (body.includes("Reply with only a short title")) { res.writeHead(404); res.end(); return; }
     const content = JSON.parse(body).messages.filter((m: any) => m.role === "user").at(-1)?.content;
     chats.push(typeof content === "string" ? content : JSON.stringify(content));
     if (chats.length === 1) return;
@@ -987,7 +1006,7 @@ it("does not offer a message the person stopped before any reply again on Codex"
   await f.send("Warm up.");
   await f.wait();
   await f.send("CODEX_STOPPED_ASK please drop the staging database");
-  await expect.poll(() => f.codexLaunches().length, { timeout: 15_000 }).toBe(2);
+  await expect.poll(() => f.codexCalls().filter((call: any) => call.method === "turn/start").length, { timeout: 15_000 }).toBe(2);
   await f.api(`/api/bots/${f.chief.id}/interrupt`, { threadId: f.thread });
   await f.idle();
   f.open(f.gate("slow"));
@@ -1331,8 +1350,8 @@ it("moves a Codex chat to a new thread with its history when the person clears a
   f.plan[f.chief.id] = { reply: "On high effort" };
   await f.send("Think harder about this one.");
   await f.wait();
-  expect(f.codexCalls().filter((call: any) => call.method === "thread/resume")).toHaveLength(1);
-  expect(f.codexCalls().find((call: any) => call.method === "turn/start")?.params.effort).toBe("high");
+  expect(f.codexCalls().filter((call: any) => call.method === "thread/start")).toHaveLength(1);
+  expect(f.codexCalls().filter((call: any) => call.method === "turn/start").at(-1)?.params.effort).toBe("high");
 
   // turn/start cannot clear it: resuming would keep the thread on "high".
   await f.selectModel(model);

@@ -100,6 +100,10 @@ export const USER_ERROR = {
   "serverError.department.deleteBusy": "Stop this department's active work before deleting it",
   "serverError.department.generalChief": "General already has a Chief of Staff. Move or change this department's Chief before deleting it",
   "serverError.backup.recursiveLink": "Cannot back up a symbolic link to the folder that contains it: {path}",
+  "serverError.backup.dataQueryRunning": "{bot}'s Data query is still running and did not stop when asked. Fully quit and reopen OpenMausBot (or restart the hosted server) to stop it, then try again.",
+  "serverError.backup.dataCloseFailed": "{bot}'s Data tables could not be closed for the backup ({detail}). Fully quit and reopen OpenMausBot (or restart the hosted server), then try again.",
+  "serverError.backup.tooLargeData": "This installation exceeds the 10 GB backup limit; {size} of it is bots' Data tables.",
+  "serverError.backup.legacyBursts": "This backup's burst records (bursts.db) are damaged, so nothing was restored and nothing here changed. Make a new backup where it came from.",
   "serverError.setup.noTools": "This bot's AI can't set it up by itself. Tell the bot what you'd like it to do instead.",
   "serverError.setup.missingConversation": "There is no such conversation.",
   "serverError.setup.stopOwner": "Only the person who pressed Set me up, or an owner or admin, can stop it.",
@@ -154,6 +158,7 @@ export const USER_ERROR = {
   "serverError.signIn.answeredInChat": "this sign-in request was already answered in the chat",
   "serverError.signIn.alreadyDone": "this sign-in request was already marked done",
   "serverError.signIn.alreadyCancelled": "this sign-in request was already cancelled",
+  "serverError.signIn.expired": "this request already expired",
   "serverError.inbox.answerNotPassed": "That answer can't be passed back.",
   "serverError.room.nameOneLine": "room name must fit on one line",
   "serverError.computer.systemUnsupported": "bots can't use this computer on this system — choose another place for this bot to work",
@@ -186,6 +191,7 @@ export const USER_ERROR = {
   "serverError.postiz.addressAsText": "Send the Postiz address as text.",
   "serverError.secret.localService": "A local service cannot enter a secret. Enter it in OpenMausBot.",
   "serverError.secret.cloudOwnerOnly": "Only the owner of this Cloud can enter this secret.",
+  "serverError.card.cloudOwnerOnly": "Only the owner of this Cloud can answer this card. Chats started by other people always ask the owner first, whatever the bot's access level.",
   "serverError.secret.conversationOwnerOnly": "Only the person this conversation belongs to can enter this secret.",
   "serverError.secret.credentialSavingFromPhone": "this credential is currently being saved from a phone",
   "serverError.secret.credentialDismissed": "this credential request was dismissed",
@@ -200,6 +206,7 @@ export const USER_ERROR = {
   "serverError.attachment.alreadyInMessage": "This file is already in a message, so it stays.",
   "serverError.engine.signedOut": "{name} is signed out.",
   "serverError.bot.viewOnly": "You can view {bot}, not chat with it.",
+  "serverError.bot.alwaysAllowFull": "This bot already always-allows {max} tools. Remove one under Access in its settings, then try again.",
   "serverError.share.ownBot": "Chats with your own MausBot stay yours, so they can't be shared.",
   "serverError.share.alreadyTeam": "This conversation is already shared with the team.",
   "serverError.share.notYours": "Only the person this conversation belongs to can share it.",
@@ -217,7 +224,8 @@ export const USER_ERROR = {
   "serverError.mailbox.adminOnly": "Only the owner or an admin can manage the mailboxes.",
   "serverError.mailbox.addressAndPassword": "Enter your email address and password.",
   "serverError.mailbox.outgoingFields": "Check the outgoing server: a name like mail.example.com, a port from 1 to 65535, and SSL/TLS or STARTTLS.",
-  "serverError.voice.fishKeyRequired": "Add a Fish Audio or ElevenLabs key in Settings → API keys to talk to your bots here.",
+  "serverError.voice.deepseekKeyRequired": "Add a DeepSeek API key in Settings → AI → Other services to talk to your bots with DeepSeek voice.",
+  "serverError.voice.fishKeyRequired": "Add a Fish Audio or ElevenLabs key in Settings → AI → Other services to talk to your bots here.",
   "serverError.voice.fishTranscribeConnection": "Couldn't reach Fish Audio to hear you — check your connection.",
   "serverError.voice.elevenLabsTranscribeConnection": "Couldn't reach ElevenLabs to hear you — check your connection.",
   "serverError.file.tooLarge": "This file is {size}, over the {limit} limit for opening files from chat. The file itself is still saved as {name}.",
@@ -244,6 +252,12 @@ export function userErrorFields(value: unknown): Pick<ServerErrorBody, "errorKey
   const params = errorParams && typeof errorParams === "object" && !Array.isArray(errorParams)
     ? redactParams(errorParams as ServerTextParams) : undefined;
   return { errorKey, ...(params ? { errorParams: params } : {}) };
+}
+
+/** A refusal another module words in English, with its language-pack key when it is one of these lines word for word. */
+export function refusalText(error: string): ServerErrorBody {
+  const key = (Object.keys(USER_ERROR) as UserErrorKey[]).find((candidate) => USER_ERROR[candidate] === error);
+  return key ? userError(key) : { error };
 }
 
 export function refusalBody(refusal: { error: string; errorKey?: string; errorParams?: ServerTextParams }): ServerErrorBody {

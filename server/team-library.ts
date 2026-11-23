@@ -1,13 +1,15 @@
 import { parseJson, type JsonValue } from "./schema.ts";
 import { isBotPackage, parseBotPackage, parsePackageDocument, upgradeV1, type PackageDocument, type ParsedBotPackage } from "./bot-package.ts";
 import { PACKAGE_V1_VERSION } from "../shared/package-format.ts";
+import { fetchGithubFolder } from "./share-github.ts";
 import { parseTeamManifest, type ParsedTeamManifest } from "./team-manifest.ts";
 
 export const TEAM_LIBRARY_REPOSITORY = "https://github.com/milind-soni/openmausbot-teams";
 export const TEAM_LIBRARY_RAW_ROOT = "https://raw.githubusercontent.com/milind-soni/openmausbot-teams/main";
 export const TEAM_LIBRARY_CATALOG_URL = `${TEAM_LIBRARY_RAW_ROOT}/catalog.json`;
 
-const MAX_CATALOG_BYTES = 256_000;
+// Templates published from MausBot are merged into the catalog automatically, so it grows by several a day.
+const MAX_CATALOG_BYTES = 2_000_000, MAX_CATALOG_TEAMS = 1000;
 const MAX_MANIFEST_BYTES = 1_000_000;
 
 export interface TeamCatalogEntry {
@@ -21,6 +23,8 @@ export interface TeamCatalogEntry {
   package?: string;
   manifest: string;
   readme: string;
+  /** A template folder (`teams/<slug>`): read whole, with its skills and pictures, instead of the files made from it. */
+  folder?: string;
   members: number;
   skills: string[];
   requires: { apps: string[] };
@@ -69,7 +73,7 @@ export function parseTeamCatalog(value: unknown): TeamCatalog {
   if (!isRecord(value) || value.format !== "openmaus.catalog" || value.version !== 1) {
     throw new Error("The team library catalog is not supported");
   }
-  if (!Array.isArray(value.teams) || value.teams.length > 100) {
+  if (!Array.isArray(value.teams) || value.teams.length > MAX_CATALOG_TEAMS) {
     throw new Error("The team library catalog is invalid");
   }
   const slugs = new Set<string>();
@@ -97,6 +101,7 @@ export function parseTeamCatalog(value: unknown): TeamCatalog {
         ? { package: relativeFile(raw.package, `${field}.package`, ".md", "packages/") }
         : {}),
       manifest: relativeFile(raw.manifest, `${field}.manifest`, ".mausteam.json", prefix),
+      ...(raw.folder === `teams/${slug}` ? { folder: `teams/${slug}` } : {}),
       readme: relativeFile(raw.readme, `${field}.readme`, "README.md", prefix),
       members:
         typeof raw.members === "number" && Number.isSafeInteger(raw.members) && raw.members > 0 && raw.members <= 200
@@ -177,6 +182,10 @@ export async function fetchLibraryTeam(slug: string, fetcher: Fetcher = fetch): 
   const catalog = await fetchTeamCatalog(fetcher);
   const entry = catalog.teams.find((team) => team.slug === slug);
   if (!entry) throw Object.assign(new Error("That library team was not found"), { status: 404 });
+  if (entry.folder) {
+    const folder = await fetchGithubFolder(`${TEAM_LIBRARY_RAW_ROOT}/${entry.folder}`, fetcher);
+    return folder.kind === "package" ? folder.document : parseTeamManifest(folder.manifest as Parameters<typeof parseTeamManifest>[0]);
+  }
   return fetchShareable(`${TEAM_LIBRARY_RAW_ROOT}/${entry.package ?? entry.manifest}`, fetcher);
 }
 

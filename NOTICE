@@ -6,8 +6,9 @@ Version 2.0, with the consent of all contributors whose copyright was
 incorporated before the transition.
 
 The Google Antigravity ACP integration adapts release, installation, profile,
-authentication, and runtime temporary-folder behavior from T3 Code, Copyright
-2026 T3 Tools Inc., used under the MIT License (third_party/t3-code/LICENSE).
+authentication, sign-out, session setup, client name, turn-outcome,
+usage-limit, and runtime temporary-folder behavior from T3 Code, Copyright 2026 T3 Tools Inc., used under the MIT License
+(third_party/t3-code/LICENSE).
 
 Selected-text citation matching adapts T3 Code's assistant citation selection,
 Copyright 2026 T3 Tools Inc., used under the MIT License.
@@ -71,6 +72,12 @@ Selected provider icon paths are from Simple Icons, used under CC0 1.0.
 The Cohere provider icon path is from Lobe Icons, Copyright 2023 LobeHub,
 used under the MIT License.
 
+The Cursor provider mark (src/components/CursorMark.tsx) adapts the Cursor
+provider icon path of T3 Code (packages/provider-cursor/src/client.ts),
+Copyright 2026 T3 Tools Inc., used under the MIT License
+(third_party/t3-code/LICENSE). The mark is Cursor's trademark and is shown
+only to identify the Cursor provider.
+
 The model provider catalog bundles provider and model data from models.dev,
 https://github.com/anomalyco/models.dev, Copyright (c) 2025 models.dev, used
 under the MIT License. Its cache and refresh logic is adapted from OpenCode,
@@ -92,6 +99,11 @@ server browser and preview tools: its session control, tab lifecycle,
 viewers and screencast pacing, tool definitions and snapshot bound
 (apps/server/src/preview and apps/server/src/mcp), Copyright 2026 T3 Tools
 Inc., used under the MIT License (third_party/t3-code/LICENSE).
+
+The input gate of the bots' browser desktop view
+(server/browser/desktop/rfb-filter.ts) adapts the RFB client-message filter of
+Hermes Agent, https://github.com/NousResearch/hermes-agent, Copyright (c) 2025
+Nous Research, used under the MIT License (third_party/hermes-agent/LICENSE).
 
 The social post previews template (skills/social-posts/posts.html) adapts the
 post card markup and platform styling of MiniMock,

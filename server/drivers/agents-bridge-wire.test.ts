@@ -87,37 +87,37 @@ const FULL = "skills+shared+voice+x+team+images+hosting";
  * either: lock a saving in by lowering the number. A Chief's list is longer
  * than another bot's only by the Chief-only names in find_tool's description. */
 const BUDGET_BASELINE: Record<string, number> = {
-  "default": 18394,
-  "voice": 19221,
-  "shared": 18434,
-  "shared+voice": 19261,
-  "skills": 18421,
-  "skills+voice": 19248,
-  "skills+shared": 18461,
-  "skills+shared+voice": 19288,
-  "non-chief": 18277,
-  "voice+non-chief": 19010,
-  "shared+non-chief": 18317,
-  "shared+voice+non-chief": 19050,
-  "skills+non-chief": 18304,
-  "skills+voice+non-chief": 19037,
-  "skills+shared+non-chief": 18344,
-  "skills+shared+voice+non-chief": 19077,
-  "skills+shared+voice+cloud-home": 19304,
-  "skills+shared+voice+non-chief+cloud-home": 19093,
-  "skills+shared+voice+x": 19367,
-  "skills+shared+voice+x+team": 19367,
-  "default+legacy-switches": 18394,
-  "default+mausbot": 18446,
-  "skills+shared+voice+mausbot": 19340,
-  "default+no-computer-pick": 17182,
-  "default+room": 17389,
-  "non-chief+room": 17272,
-  "skills+shared+voice+x+team+images": 19289,
-  "default+images": 18410,
-  "skills+shared+voice+x+team+images+hosting": 20683,
-  "default+hosting": 19758,
-  "default+tools-off": 17781,
+  "default": 17726,
+  "voice": 18507,
+  "shared": 17766,
+  "shared+voice": 18547,
+  "skills": 17753,
+  "skills+voice": 18534,
+  "skills+shared": 17793,
+  "skills+shared+voice": 18574,
+  "non-chief": 17609,
+  "voice+non-chief": 18390,
+  "shared+non-chief": 17649,
+  "shared+voice+non-chief": 18430,
+  "skills+non-chief": 17636,
+  "skills+voice+non-chief": 18417,
+  "skills+shared+non-chief": 17676,
+  "skills+shared+voice+non-chief": 18457,
+  "skills+shared+voice+cloud-home": 18590,
+  "skills+shared+voice+non-chief+cloud-home": 18473,
+  "skills+shared+voice+x": 18635,
+  "skills+shared+voice+x+team": 18635,
+  "default+legacy-switches": 17726,
+  "default+mausbot": 17778,
+  "skills+shared+voice+mausbot": 18626,
+  "default+no-computer-pick": 16514,
+  "default+room": 16455,
+  "non-chief+room": 16338,
+  "skills+shared+voice+x+team+images": 18651,
+  "default+images": 17742,
+  "skills+shared+voice+x+team+images+hosting": 19853,
+  "default+hosting": 18928,
+  "default+tools-off": 16087,
 };
 
 type RpcAnswer = { id: number; result?: { tools?: unknown[]; content?: Array<{ text: string }>; isError?: boolean }; error?: { code: number; message: string } };
@@ -286,7 +286,7 @@ describe("agents proxy tools/list golden with the tool bridge on", () => {
   it("keeps the same hot tools whatever the role and features, except the ones a profile does not have", () => {
     const hotOf = (name: string) => toolsOf(wires[name]!).slice(0, -2).map((tool) => tool.name);
     const base = hotOf("default");
-    expect(base).toEqual(["tool_result_read", "list_room_targets", "coordinate_bots", "list_bots", "list_rooms", "select_computer", "attach_file", "publish_page", "post_to_room", "post_to_thread", "request_credential", "request_sign_in", "fill_login", "message_person", "memory_update"]);
+    expect(base).toEqual(["tool_result_read", "list_room_targets", "coordinate_bots", "list_bots", "list_rooms", "select_computer", "attach_file", "publish_page", "post_to_room", "post_to_thread", "request_credential", "request_sign_in", "fill_login", "message_person", "share", "memory_update"]);
     for (const name of Object.keys(PROFILES)) {
       const selects = PROFILES[name]!.OMB_COMPUTER_SELECTION === "1";
       const off = toolsOffNames(toolsOffFromEnv(PROFILES[name]!.OMB_TOOLS_OFF));

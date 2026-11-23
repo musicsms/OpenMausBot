@@ -263,7 +263,7 @@ it("Connect to a server never sits grey without saying why: it says it is lookin
   expect(form.querySelector("[data-connect-problem]")?.textContent).toBe("Can't reach 192.168.1.21:8799. Check the server is running and reachable from this computer.");
 });
 
-it("Connect to a server says plainly that another computer's desktop app can't be connected to, and points to My Cloud", async () => {
+it("Connect to a server says how another computer's desktop app is opened from here: its Your other computers link, or My Cloud", async () => {
   const probe = vi.fn(async (address: string): Promise<unknown> => (address === "123456"
     ? { outcome: "problem", problem: "oldCode" }
     : { outcome: "problem", problem: "desktopApp", host: "192.168.1.30:8799" }));
@@ -272,17 +272,20 @@ it("Connect to a server says plainly that another computer's desktop app can't b
   await click(host.querySelector("[data-rail-add]"));
   await click(document.querySelector('[data-place-add-choice="server"]'));
   const form = document.querySelector('[data-place-add="own-server"]')!;
+  expect(form.querySelector("[data-connect-other-computer]")?.textContent).toBe("For another computer running the MausBot app: on that computer, open Settings → Phone & devices → Your other computers.");
   await type(form.querySelector("[data-own-server-link]"), "192.168.1.30:8799");
   await settle();
   const line = form.querySelector("[data-connect-problem]")?.textContent ?? "";
-  expect(line).toContain("192.168.1.30:8799 is a MausBot desktop app, and one desktop app can't connect to another");
+  expect(line).toContain("192.168.1.30:8799 is a MausBot desktop app. To open it from here, turn on Tailscale and Your other computers in its Settings → Phone & devices, then use the link shown there.");
   expect(line).toContain("My Cloud");
-  expect(line).not.toContain("isn't a MausBot server");
+  expect(line).not.toMatch(/can't connect to another|isn't a MausBot server/);
   expect((form.querySelector("[data-own-server-connect]") as HTMLButtonElement).disabled).toBe(true);
-  // The 6-digit code a desktop app shows for pairing a phone gets the same pointer, not "a code from an older MausBot".
   await type(form.querySelector("[data-own-server-link]"), "123456");
   await settle();
-  expect(form.querySelector("[data-connect-problem]")?.textContent).toContain("That 6-digit code pairs a phone with a desktop app");
+  const code = form.querySelector("[data-connect-problem]")?.textContent ?? "";
+  expect(code).toContain("That code is for the phone app. To open that computer from here, turn on Tailscale and Your other computers in its Settings → Phone & devices, then use the link shown there.");
+  expect(code).toContain("My Cloud");
+  expect(code).not.toMatch(/can't connect to another|older MausBot/);
 });
 
 it("an address typed key by key stays in its box; a pasted one moves on to the code", async () => {
@@ -608,7 +611,7 @@ it("a server of the person's own that main offers as home: its menu's one tap st
   await act(async () => { host.querySelector("[data-rail-menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
   const menu = await menuOf("garage");
   const row = menu!.querySelector("[data-rail-make-home-start]");
-  expect(row?.textContent).toBe("Make Garage server my homeMoves this computer's bots, chats, memory and routines to Garage server, and this computer then works for it.");
+  expect(row?.textContent).toBe("Make Garage server my homeMoves this computer's bots, chats, memory and routines to Garage server, and this computer then works for it. Tables your bots loaded in Data don't move: they stay on this computer, where your bots can't open them once they live on Garage server.");
   await click(row);
   await settle();
   expect(makeHome).toHaveBeenCalledWith("garage");
@@ -889,4 +892,35 @@ it("two quick clicks: the place still marked can be clicked to stay, so the last
   await click(host.querySelector('[data-rail-place="profile:default"]'));
   await click(host.querySelector('[data-rail-place="profile:work"]'));
   expect(workspaces.open.mock.calls).toEqual([["profile:default"], ["profile:work"]]);
+});
+
+it("a server saved by hand: its menu offers Rename, saved by main on this computer only; a Cloud's menu does not", async () => {
+  const rename = vi.fn(async (_id: string, _name: string): Promise<{ outcome: "saved" | "name" | "failed" | "unsupported" }> => ({ outcome: "failed" }));
+  rail = { places: [
+    place("home", "My Cloud", { active: true, paint: { swatch: null } }),
+    place("vps", "ubuntu-lan", { kind: "server", renames: true, removable: true, forget: true, paint: { swatch: null } }),
+  ], add: { cloud: false, link: true, address: false } };
+  Object.assign(window, { ogb: { workspaces: { ...workspaces, rename }, cloudAdd, rail: { expand: vi.fn(async () => {}), onSkin: () => () => {} } } });
+  await mount(createElement(PlacesRail, { chrome: true }));
+  const settle = () => act(async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); });
+  const menuOf = async (id: string) => {
+    await act(async () => { host.querySelector(`[data-rail-place="${id}"]`)!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })); });
+    return host.querySelector(`[data-rail-menu="${id}"]`)!;
+  };
+  expect((await menuOf("home")).querySelector("[data-rail-rename]"), "a Cloud keeps the name its Admin gives it").toBeNull();
+  await act(async () => { host.querySelector("[data-rail-menu]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+  const menu = await menuOf("vps");
+  expect(document.activeElement, "Rename is the first row").toBe(menu.querySelector("[data-rail-rename]"));
+  await click(menu.querySelector("[data-rail-rename]"));
+  const field = menu.querySelector<HTMLInputElement>("[data-rail-rename-form] input")!;
+  expect(field.value, "starts from the name it has").toBe("ubuntu-lan");
+  await type(field, " 家里的服务器 ");
+  await submit(menu.querySelector("[data-rail-rename-form]"));
+  await settle();
+  expect(menu.querySelector("[data-rail-rename-form] [role='alert']")?.textContent).toBe("That didn't work. Try again in a moment.");
+  rename.mockResolvedValueOnce({ outcome: "saved" });
+  await submit(menu.querySelector("[data-rail-rename-form]"));
+  await settle();
+  expect(rename.mock.calls, "by the circle's own id, which main listed").toEqual([["vps", "家里的服务器"], ["vps", "家里的服务器"]]);
+  expect(host.querySelector("[data-rail-menu]"), "saved: the menu closes").toBeNull();
 });

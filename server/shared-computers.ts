@@ -26,6 +26,8 @@ export const sharedComputerRegistration = z.object({
   mcpServers: z.literal(true).optional(),
   /** The environment ids of its own OpenMausBot installs, which an MCP server's `runsOn` names; sent with mcpServers. */
   environments: z.array(z.string().uuid()).max(8).optional(),
+  /** It passes an MCP call's caller on to the MCP server; sent only to a server that advertises mcpCaller. */
+  mcpCaller: z.literal(true).optional(),
 }).strict();
 const wireSecrets = z.record(z.string().min(1).max(256), z.string().max(16_384));
 /** An MCP server as this server keeps it for a lent computer: that computer starts, or reaches, exactly this and nothing else. */
@@ -44,8 +46,11 @@ export const sharedComputerOperation = z.object({
   command: z.string().max(8000).optional(), timeout_seconds: z.number().int().min(1).max(900).optional(), tool_name: z.string().max(256).optional(),
   arguments: z.record(z.string(), z.unknown()).optional(), server: lentMcpServer.optional(),
 }).strict();
+/** Which bot and conversation made an MCP call: a hint for the MCP server, never proof of identity. Only this server's
+ * own lent-MCP route sets it; a bot's shared_computer operation can't (sharedComputerOperation refuses the field). */
+export type McpCaller = { botId: string; threadId: string };
 type Registration = z.infer<typeof sharedComputerRegistration>;
-type Operation = z.infer<typeof sharedComputerOperation>;
+type Operation = z.infer<typeof sharedComputerOperation> & { caller?: McpCaller };
 const COMMAND_SECONDS = 120;
 const OLD_MAX_COMMAND_SECONDS = 240;
 /** The desktop gives a server's first start (a package runner fetching it) 130 seconds and a tool call 300. */
@@ -67,6 +72,8 @@ export type SharedComputerStatus = {
 export type KnownLentComputer = {
   id: string; name: string; platform: "darwin" | "win32" | "linux" | null; online: boolean; busy: boolean; lent: boolean;
   lastSeenAt: number; lastUsedAt: number | null; scopes: { folders: number; terminal: boolean; screen: boolean; internet: boolean; chrome: boolean };
+  /** The person typed this turn's line on it: the session that sent the line lends it, online now. */
+  typing?: true;
 };
 /** The bot an action is for, so the lent computer's menu can name it with its colour. */
 export type ActingBot = { name: string; color: string };
@@ -276,15 +283,28 @@ export class SharedComputers {
       .map((entry) => ({ id: entry.registration.id, name: entry.registration.name, platform: entry.registration.platform ?? null, session: entry.owner.session, environmentId: entry.registration.environments![0]!, seen: entry.seen }))
       .sort((a, b) => b.seen - a.seen);
   }
-  /** Every computer this person lent, now or before, newest first: online, offline since, or no longer lent. */
-  known(principal: string | null): KnownLentComputer[] {
+  /** Every computer this person lent, now or before, newest first: online, offline since, or no longer lent.
+   * `sending`: the session that sent this turn's line. The desktop lends its computer with its window's own session, so
+   * an online computer lent by that session is the one they type on: marked, and put first. */
+  known(principal: string | null, sending?: string): KnownLentComputer[] {
     if (!principal) return [];
-    return (this.lent?.list(principal) ?? []).map(record => {
+    const typing = sending === undefined ? undefined
+      : [...this.computers.values()].find(entry => entry.owner.person === principal && entry.owner.session === sending && this.online(entry));
+    const records = this.lent?.list(principal) ?? [];
+    const known = records.map((record): KnownLentComputer => {
       const entry = this.chosen(principal, record.id);
-      return { id: record.id, name: record.name, platform: record.platform, online: entry ? this.online(entry) : false, busy: (entry?.jobs.size ?? 0) > 0,
+      return { ...(record.id === typing?.registration.id ? { typing: true as const } : {}), id: record.id, name: record.name, platform: record.platform, online: entry ? this.online(entry) : false, busy: (entry?.jobs.size ?? 0) > 0,
         lent: record.stoppedAt === null, lastSeenAt: entry ? Math.max(entry.seen, record.lastSeenAt) : record.lastSeenAt, lastUsedAt: record.lastUsedAt,
         scopes: { folders: record.folders, terminal: record.terminal, screen: record.screen, internet: record.internet === true, chrome: record.chrome === true } };
     });
+    // Two computers with one name share one record, kept for the newer, so the one they type on can have none: listed live.
+    const unrecorded = typing && !records.some(record => record.id === typing.registration.id) ? [typing] : [];
+    return [
+      ...unrecorded.map(({ registration, jobs, seen }): KnownLentComputer => ({ typing: true, id: registration.id, name: registration.name, platform: registration.platform ?? null,
+        online: true, busy: jobs.size > 0, lent: true, lastSeenAt: seen, lastUsedAt: null,
+        scopes: { folders: registration.folders.length, terminal: registration.terminal, screen: registration.computer, internet: registration.internet === true, chrome: registration.chrome === true } })),
+      ...known.filter(computer => computer.typing), ...known.filter(computer => !computer.typing),
+    ];
   }
   /** For a bot: which known computer is offline and since when, and the sentence to say; nothing while one is online. */
   away(principal: string | null) {
@@ -445,7 +465,9 @@ export class SharedComputers {
     const { timeout_seconds: _timeout, ...withoutTimeout } = operation;
     const timed = entry.registration.commandTimeouts ? operation : withoutTimeout;
     const { old_text: _old, new_text: _new, ...withoutEdits } = timed;
-    const forDesktop = entry.registration.fileEdits ? timed : withoutEdits;
+    const edited = entry.registration.fileEdits ? timed : withoutEdits;
+    const { caller: _caller, ...withoutCaller } = edited;
+    const forDesktop = entry.registration.mcpCaller && operation.action === "mcp_call" ? edited : withoutCaller;
     return new Promise((resolve, reject) => {
       const id = randomUUID();
       const job: Job = { id, operation: forDesktop, ...(by ? { by: { name: by.name, color: by.color } } : {}), active, sent: false, leased: false, resolve, reject, timer: setTimeout(() => this.finish(entry, job, failure("Computer action timed out. Its outcome is unknown; inspect before retrying.")), jobDeadlineMs(entry.registration, operation)) };

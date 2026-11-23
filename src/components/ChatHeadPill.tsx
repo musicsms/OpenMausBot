@@ -57,9 +57,9 @@ export function ChatHeadPill({ bot, avatar, privacy, onToggle }: {
       aria-label={conversation ? `${label}, ${conversation}` : label}
       aria-expanded={open}
       aria-controls={open ? BOT_PANEL_ID : undefined}
-      className={cn("group flex min-w-0 max-w-full items-center gap-2 rounded-full py-[7.5px] pl-[7.5px] pr-[13.5px] text-ink", ELEVATED_FLOAT, ELEVATED_HOVER)}
+      className={cn("group flex min-w-0 max-w-full items-center gap-2 rounded-full py-[5.5px] pl-[5.5px] pr-[13.5px] text-ink", ELEVATED_FLOAT, ELEVATED_HOVER)}
     >
-      <BotAvatar bot={bot} size={24} {...avatar} />
+      <BotAvatar bot={bot} size={28} {...avatar} />
       <span dir="auto" className="min-w-0 truncate text-[14px] font-medium leading-5">{bot.name}</span>
       {conversation && (
         <>
@@ -77,8 +77,9 @@ export function ChatHeadPill({ bot, avatar, privacy, onToggle }: {
         <span role="img" data-chathead-elsewhere aria-label={t("task.otherActivity", { count: elsewhere })} className="size-1.5 shrink-0 rounded-full bg-accent" />
       )}
       {!open && !conversation && (
-        <span aria-hidden="true" data-chathead-chevron className="-ml-0.5 flex shrink-0">
-          <ChevronRight size={12} className={cn("shrink-0 text-ink-tertiary transition-transform group-hover:translate-x-0.5 group-focus-visible:translate-x-0.5", CHEVRON_MOTION)} />
+        // Hidden at rest and folded into the gap, so the pill stays tight; it slides in on hover or keyboard focus.
+        <span aria-hidden="true" data-chathead-chevron className={cn("-ml-2 flex w-0 shrink-0 overflow-hidden opacity-0 transition-[width,margin,opacity] group-hover:-ml-0.5 group-hover:w-3 group-hover:opacity-100 group-focus-visible:-ml-0.5 group-focus-visible:w-3 group-focus-visible:opacity-100", CHEVRON_MOTION)}>
+          <ChevronRight size={12} className="shrink-0 text-ink-tertiary" />
         </span>
       )}
     </button>

@@ -114,6 +114,7 @@ describe("self-hosted relay server mode", () => {
         dataDir: dir,
         sessions: mockSessions,
         handle: () => {},
+        upgrades: { accept: () => false },
         serverName: () => "VPS",
         publicOrigin: () => null,
         version: "0.1.0",

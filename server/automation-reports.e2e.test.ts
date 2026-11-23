@@ -209,7 +209,10 @@ it("copies a question a run waits on into the main chat, and the answer given th
   await s.api("POST", `/api/threads/${s.main}/respond`, { requestId: copy.card.requestId, behavior: "answer", message: "Work" });
   await expect.poll(() => answers.find((answer) => answer.id === "which-account"), { timeout: 20_000 }).toMatchObject({ t: "answer", behavior: "answer", message: "Work", source: "user" });
   await s.settled(id, "running");
-  await expect.poll(async () => (await s.messages(s.main)).find((message) => message.id === copy.id)?.card?.answered, { timeout: 20_000 }).toBeTruthy();
+  await expect.poll(async () => {
+    const settledCopy = (await s.messages(s.main)).find((message) => message.id === copy.id);
+    return [settledCopy?.card?.answered, settledCopy?.automation?.needsYou];
+  }, { timeout: 20_000 }).toEqual(["answer", undefined]);
   expect((await s.messages(threadId)).find((message) => message.id === original.id)?.card?.answered).toBeTruthy();
   writeFileSync(gate, "done");
   await s.reported(id, "posted");
@@ -383,7 +386,11 @@ it("does not take a person's failed turn in a run's conversation for the run's o
 
 it("says in the main chat, once per run of failures, that an automation could not finish", async () => {
   const s = await server();
-  s.script([{ key: "run", match: [s.header("Inbox watch")], reply: "never", fail: true, repeat: true }]);
+  // The automatic second start does not repeat the routine's header; it fails the same way, so both runs end on one error.
+  s.script([
+    { key: "run", match: [s.header("Inbox watch")], reply: "never", fail: true, repeat: true },
+    { key: "retry", match: ["this run's first start"], reply: "never", fail: true, repeat: true },
+  ]);
   const routineId = await s.routine("Inbox watch");
   const first = await s.runNow(routineId);
   await s.settled(first, "failed");
@@ -393,6 +400,7 @@ it("says in the main chat, once per run of failures, that an automation could no
   })]);
   const second = await s.runNow(routineId);
   await s.settled(second, "failed");
+  expect((await s.run(first)).error).toContain("Scripted addressed agent failure");
   expect((await s.run(second)).error).toBe((await s.run(first)).error);
   expect(await s.lines()).toHaveLength(1);
 }, 120_000);
@@ -407,11 +415,12 @@ it("tells the main chat about a run missed while the computer was off, which has
     const main = bot.activeTaskId as string;
     const { routine } = await api("POST", "/api/routines", {
       name: "Inbox watch", prompt: "Do the Inbox watch check.", botId: bot.id,
-      schedule: { type: "interval", everyMinutes: 60, anchorAt: Date.now() + 3_600_000 },
+      schedule: { type: "interval", everyMinutes: 1_440, anchorAt: Date.now() + 3_600_000 },
     });
     await restartable.stop();
     const file = join(restartable.dataDir, "routines.json");
     const saved = JSON.parse(readFileSync(file, "utf8"));
+    // Its one occurrence is more than 12 hours old, so nothing runs late in its place.
     saved.routines.find((each: any) => each.id === routine.id).nextRunAt = Date.now() - 13 * 3_600_000;
     writeFileSync(file, JSON.stringify(saved));
     await restartable.start();

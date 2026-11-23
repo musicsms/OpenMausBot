@@ -96,7 +96,7 @@ export function createEmailHost(deps: EmailHostDeps) {
     return accounts[0]!;
   }
 
-  async function call(name: EmailToolName, args: Record<string, any>, mailbox: EmailAccount, capability: { botId: string; threadId: string }): Promise<EmailToolResult> {
+  async function call(name: EmailToolName, args: Record<string, any>, mailbox: EmailAccount, capability: { botId: string; threadId: string }, assertActive: () => void): Promise<EmailToolResult> {
     const { guard } = service;
     const box = typeof args.mailbox === "string" && args.mailbox ? args.mailbox : "INBOX";
     const limit = Math.min(args.limit ?? 20, LIST_MAX);
@@ -110,9 +110,12 @@ export function createEmailHost(deps: EmailHostDeps) {
         let threading = {};
         if (args.reply_to_uid) {
           const original = await run.readMessage(mailbox, guard, { mailbox: box, uid: args.reply_to_uid });
-          if (original.messageId) threading = { inReplyTo: original.messageId };
+          // RFC 5322 section 3.6.4: keep the parent's ancestors, then append its own ID.
+          const ancestors = original.references ?? (original.inReplyTo && /^<[^<>\s]+>$/u.test(original.inReplyTo) ? [original.inReplyTo] : []);
+          const references = [...ancestors, ...(original.messageId ? [original.messageId] : [])];
+          threading = { ...(original.messageId ? { inReplyTo: original.messageId } : {}), ...(references.length ? { references: references.join(" ") } : {}) };
         }
-        return emailText({ account: from, ...await run.sendMessage(mailbox, guard, { to: args.to, subject: args.subject, text: args.text, ...pick(args, ["cc", "bcc", "html", "inline_images"]), ...threading }) });
+        return emailText({ account: from, ...await run.sendMessage(mailbox, guard, { to: args.to, subject: args.subject, text: args.text, ...pick(args, ["cc", "bcc", "html", "inline_images"]), ...threading }, assertActive) });
       }
     }
   }
@@ -164,7 +167,7 @@ export function createEmailHost(deps: EmailHostDeps) {
       if (isEmailRead(name)) deps.markOutside(capability.threadId);
       let result: EmailToolResult;
       try {
-        result = await call(name, args, mailbox, capability);
+        result = await call(name, args, mailbox, capability, assertActive);
       } catch (error) {
         if (error instanceof SendingError) {
           if (!LASTING_SENDING_FAULTS.has(error.fault)) return emailError(EMAIL_NOT_SENT_TEXT(error.message));

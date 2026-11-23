@@ -3,13 +3,16 @@
 // owner-only setting is only explained.
 import { randomUUID } from "node:crypto";
 
-import type { AppSettingRequest } from "../../shared/app-settings.ts";
+import { isSettingsCardId, SETTINGS_CARD_IDS, type AppSettingRequest, type SettingsCardId } from "../../shared/app-settings.ts";
 import { appendDecision } from "../decision-log.ts";
 import { UNDO_STALE } from "../direct-apply.ts";
+import type { TurnOwnerRefusal } from "../host/phones.ts";
 import { serverLine } from "../server-lines.ts";
 import type { BotRecord, GroupRecord, Store } from "../store.ts";
 import type { ThemeTool } from "../themes/tool.ts";
+import { cardElsewhere, cardNotInRoom, cardShownStatus, SETTINGS_CARDS } from "./cards.ts";
 import type { TakenPicture } from "./picture-file.ts";
+import { findPlaces, placePath, placesList } from "./places.ts";
 import { findSettings, personOnly, type SettingEntry, type WritableEntry } from "./registry.ts";
 
 export const TOOL = "app_settings";
@@ -63,7 +66,11 @@ export interface AppSettingsDeps {
   entries: readonly SettingEntry[];
   /** Non-null when the turn is the owner's own (phones.turnOwner); null on a Team Cloud or hosted workspace. */
   turnOwner(turn: Turn): string | null;
+  /** Why turnOwner is null (phones.turnOwnerRefusal), for the refusal's words only; turnOwner stays the guard. */
+  ownerRefusal?(turn: Turn): TurnOwnerRefusal | null;
   guestDriven(threadId: string): boolean;
+  /** The turn answers a routine, webhook or other automation, owner-written ones included: no lasting move onto this computer. */
+  automated?(turn: Turn): boolean;
   /** The secret card, as request_credential posts it. */
   requestCredential(bot: BotRecord, threadId: string, body: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }>;
   connectorThread(botId: string, threadId: string): { group?: GroupRecord } | null;
@@ -72,6 +79,8 @@ export interface AppSettingsDeps {
   themes?: ThemeTool;
   /** For a setting that takes a picture file: stores the file the bot names, or says why not. */
   pictures?: { take(turn: Turn, path: string): Promise<TakenPicture>; discard(avatarUrl: string): void };
+  /** Settings cards: whether a card's control exists on this server's own computer, and whether its setting is known to be on (null when the server cannot tell). Absent: no cards here. */
+  cards?: { here(id: SettingsCardId): boolean; on(id: SettingsCardId): true | null };
 }
 
 export function createAppSettings(deps: AppSettingsDeps) {
@@ -82,7 +91,10 @@ export function createAppSettings(deps: AppSettingsDeps) {
 
   const reply = (status: number, body: Record<string, unknown>) => ({ status, body });
   const refuse = (status: number, error: string) => reply(status, { error });
-  const describe = (entry: SettingEntry) => ({ id: entry.id, label: entry.label, tier: entry.tier, value: text(entry.read()), where: entry.where });
+  const describe = (entry: SettingEntry) => ({ id: entry.id, label: entry.label, tier: entry.tier, value: text(entry.read()), where: placePath(entry.where) });
+  /** Null when the turn is the owner's own; otherwise why not, so the refusal can say what the person can do instead. */
+  const notOwners = (turn: Turn): NotOwners | null =>
+    deps.guestDriven(turn.threadId) ? "guest" : deps.turnOwner(turn) !== null ? null : (deps.ownerRefusal?.(turn) ?? "unknown");
   const from = (bot: BotRecord, threadId: string) => (deps.connectorThread(bot.id, threadId)?.group ? { from: { botId: bot.id, name: bot.name, color: bot.color } } : {});
   const spendWrite = (turn: Turn): string | null => {
     const spent = writes.get(turn.generation) ?? 0;
@@ -121,18 +133,22 @@ export function createAppSettings(deps: AppSettingsDeps) {
     const bot = store.bot(turn.botId);
     if (!bot) return refuse(404, "This bot no longer exists.");
     if (entry.tier === "owner-only") return refuse(403, personOnly(entry.label, entry.where));
-    if (deps.guestDriven(turn.threadId) || deps.turnOwner(turn) === null) return refuse(403, "Settings change only in the owner's own conversation. This turn was not started by the owner here, so nothing changed; you may still read settings.");
+    const notOwner = notOwners(turn);
+    if (notOwner) return refuse(403, `Settings change only in the owner's own conversation. Nothing changed; you may still read settings. ${whyNotOwners(notOwner, placePath(entry.where))}`);
     if (entry.tier === "secret") {
       if (body.value !== undefined) return refuse(400, `Never send a key or token as a value. Call set on ${entry.id} with no value: a secure card asks the user for it, and you never see it.`);
       const budget = spendWrite(turn);
       if (budget) return refuse(429, budget);
       const posted = await deps.requestCredential(bot, turn.threadId, { credentialId: entry.credentialId, reason: typeof body.reason === "string" ? body.reason : undefined });
-      if (!posted.body.error && posted.body.alreadyConfigured === true) return reply(200, { text: `${entry.label} is already set. To replace it, the user changes it in ${entry.where}.` });
+      if (!posted.body.error && posted.body.alreadyConfigured === true) return reply(200, { text: `${entry.label} is already set. To replace it, the user changes it in ${placePath(entry.where)}.` });
       if (posted.status >= 300) return refuse(posted.status, String(posted.body.error ?? "The secure card could not be shown."));
       return reply(200, { text: `A secure card for ${entry.label} is ready in MausBot. End this turn now and say in one line that you are waiting for it; MausBot resumes you when the user saves it or declines. You never see the key.` });
     }
     const parsed = parseValue(entry, body.value);
     if (!parsed.success) return refuse(400, `${entry.label} takes ${entry.allowed}. ${parsed.error.issues.map((issue) => issue.message).join("; ")}`);
+    if (entry.id === "bots.settings" && (parsed.data as { computer?: unknown }).computer === "local" && deps.automated?.(turn)) {
+      return refuse(403, `A routine or automation can't keep a bot on this computer. Nothing changed: say in one line that the person can choose This computer under “Where ${bot.name} works” in Bot's screen, or ask you in their own chat.`);
+    }
     const described = entry.describe?.(parsed.data);
     if (described && "refusal" in described) return refuse(409, described.refusal);
     const budget = spendWrite(turn);
@@ -170,22 +186,47 @@ export function createAppSettings(deps: AppSettingsDeps) {
     return asked ? apply(turn, bot, themes.entry(person), asked.wear, asked.change) : themes.addAsset(turn, person, body);
   }
 
+  /** Shows a setting's own control in the conversation. Security invariant: the reply and the row carry fixed words and
+   * the card's id only; the control's code, link and address never pass through here. */
+  function showCard(turn: Turn, body: Record<string, unknown>) {
+    if (!isSettingsCardId(body.card)) return refuse(404, `No settings card ${JSON.stringify(body.card ?? null)}. Cards: ${SETTINGS_CARD_IDS.join(", ")}.`);
+    const card = SETTINGS_CARDS[body.card];
+    const bot = store.bot(turn.botId);
+    if (!bot) return refuse(404, "This bot no longer exists.");
+    const notOwner = notOwners(turn);
+    if (notOwner) return refuse(403, `A settings card shows only in the owner's own conversation, when they asked. Nothing was shown. ${whyNotOwners(notOwner, "Settings")}`);
+    if (!deps.cards?.here(body.card)) return reply(200, { text: cardElsewhere(card) });
+    if (deps.connectorThread(bot.id, turn.threadId)?.group) return reply(200, { text: cardNotInRoom(card) });
+    const budget = spendWrite(turn);
+    if (budget) return refuse(429, budget);
+    store.appendMessage(turn.threadId, { role: "bot", kind: "text", text: card.text, settingsCard: { id: body.card } });
+    return reply(200, { text: cardShownStatus(card, deps.cards.on(body.card)) });
+  }
+
   return {
     async handle(body: Record<string, unknown>, turn: Turn): Promise<{ status: number; body: Record<string, unknown> }> {
       if (body.action === "find") {
         const query = typeof body.query === "string" ? body.query : "";
         const hits = findSettings(entries, query, FIND_LIMIT).map(describe);
-        return reply(200, { text: hits.length ? JSON.stringify(hits) : `No setting matches ${JSON.stringify(query)}. Try other words, or tell the user it is not something bots can change.` });
+        if (hits.length) return reply(200, { text: JSON.stringify(hits) });
+        const places = findPlaces(query);
+        return reply(200, { text: `No setting you can change matches ${JSON.stringify(query)}.${places.length ? ` Where the person finds it in the app: ${places.join("; ")}.` : " Try other words, or use action places."}` });
+      }
+      if (body.action === "places") {
+        const query = typeof body.query === "string" ? body.query.trim() : "";
+        const places = query ? findPlaces(query) : [];
+        return reply(200, { text: query ? (places.length ? places.join("\n") : `No place in the app matches ${JSON.stringify(query)}. Here is every place:\n${placesList()}`) : placesList() });
       }
       if (body.action === "get") {
         const entry = typeof body.id === "string" ? byId.get(body.id) : undefined;
         if (!entry) return refuse(404, `No setting with id ${JSON.stringify(body.id ?? null)}. Use action find first.`);
         return reply(200, { text: JSON.stringify({ ...describe(entry), help: entry.help, ...("allowed" in entry ? { allowed: entry.allowed } : {}),
-          change: entry.tier === "owner-only" ? `only the person, in ${entry.where}` : entry.tier === "secret" ? "set with no value opens a secure card" : "set applies at once, with Undo on the card" }) });
+          change: entry.tier === "owner-only" ? `only the person, in ${placePath(entry.where)}` : entry.tier === "secret" ? "set with no value opens a secure card" : "set applies at once, with Undo on the card" }) });
       }
       if (body.action === "set") return set(turn, body);
+      if (body.action === "show_card") return showCard(turn, body);
       if (typeof body.action === "string" && THEME_ACTIONS.includes(body.action)) return theme(turn, body);
-      return refuse(400, `action must be find, get, set, ${THEME_ACTIONS.join(", ")}.`);
+      return refuse(400, `action must be find, get, set, show_card, places, ${THEME_ACTIONS.join(", ")}.`);
     },
 
     /** Undo on an applied card: restores the value read before the change, unless it changed since. */
@@ -204,4 +245,23 @@ export function createAppSettings(deps: AppSettingsDeps) {
       return { claimed: true, state: "undone" };
     },
   };
+}
+
+type NotOwners = TurnOwnerRefusal | "guest" | "unknown";
+
+/** Why a turn is not the owner's own, and what the person can do instead, in words the bot can pass on. */
+export function whyNotOwners(why: NotOwners, where: string): string {
+  const themselves = `The person can change it themselves in ${where}.`;
+  const fresh = "Or they ask again in a new conversation with this bot that only they write in.";
+  switch (why) {
+    case "shared": return `Several people share this server, so bots never change its settings. ${themselves}`;
+    case "service": return `This server is set up as a shared or hosted server, so bots never change its settings. ${themselves}`;
+    case "guest": return `A guest writes in this conversation, so it is not the owner's own. ${themselves}`;
+    case "someone-else": return `Someone else wrote or answered in this conversation, or a bot opened it, so asking again here won't work. ${themselves} ${fresh}`;
+    case "not-owner": return `This turn was started by someone other than the owner, or by a routine, webhook or app the owner didn't write. ${themselves} ${fresh}`;
+    case "memory-changed":
+    case "memory-changed-here": return `This bot's memory was changed in a conversation the owner didn't write. ${themselves} Or, in this bot's settings, they open Memory, check what changed, tap Mark reviewed and ask again.`;
+    case "unproven":
+    case "unknown": return `This turn can't be tied to a message the owner sent here (it was stopped, or started another way). ${themselves} Or they send the request again.`;
+  }
 }

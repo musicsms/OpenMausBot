@@ -155,7 +155,7 @@ function localBrowserTrust(env: NodeJS.ProcessEnv, fromSource: boolean, trust: L
   return { trusted: true, warning: `${LOCAL_BROWSER_TRUST}=1: browsers on this machine act as the owner (development only)` };
 }
 
-export const BROWSER_SIGN_IN = "unauthorized: this browser is not signed in. Open the sign-in link that openmausbot serve or openmausbot pair prints on this computer, or pair it with a code from Settings → Remote access";
+export const BROWSER_SIGN_IN = "unauthorized: this browser is not signed in. Open the sign-in link that openmausbot serve or openmausbot pair prints on this computer, or pair it with a code from Settings → Phone & devices";
 
 export function isAllowedOrigin(origin: string | undefined | null): boolean {
   if (!origin) return true; // non-browser clients (CLIs, curl, tests) send none
@@ -328,6 +328,8 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/phones\/self$/ },
   { methods: ["GET"], path: /^\/api\/phones\/self\/jobs$/ },
   { methods: ["POST"], path: /^\/api\/phones\/self\/jobs\/[\w-]+\/(?:lease|result)$/ },
+  // This phone's own push registrations, alerts and Live Activities, keyed by its session (routes/phone-push.ts).
+  { methods: ["GET", "PUT", "DELETE"], path: /^\/api\/push\/(?:device|activity)$/ },
   { methods: ["GET"], path: /^\/api\/health$/ },
   { methods: ["GET"], path: /^\/api\/edition$/ },
   { methods: ["GET"], path: /^\/api\/brand$/ },
@@ -338,6 +340,8 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["GET"], path: /^\/api\/team-map$/ },
   // a link into the organisation's Admin: identifiers only, and Admin authorizes its own visitor
   { methods: ["GET"], path: /^\/api\/bots\/[\w-]+\/slack-management$/ },
+  // what a bot made in the conversations this viewer can read, the same rows those conversations' messages show (routes/bot-library.ts)
+  { methods: ["GET"], path: /^\/api\/bots\/[\w-]+\/library$/ },
   { methods: ["GET"], path: /^\/api\/search$/ },
   { methods: ["GET"], path: /^\/api\/threads\/[\w-]+\/messages$/ },
   { methods: ["GET"], path: /^\/api\/threads\/[\w-]+\/messages\/[\w-]+\/image$/ },
@@ -356,6 +360,7 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/active-branch$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/compact$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/start-fresh$/ },
+  { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/context$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/helper-followup$/ }, // MausBot's own person only: see mayFollowUp
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/interrupt$/ },
   { methods: ["POST"], path: /^\/api\/bots\/[\w-]+\/read$/ },
@@ -490,6 +495,15 @@ export const CLIENT_ALLOW: ReadonlyArray<{ methods: readonly string[]; path: Reg
   // what the viewer's own bots put online, from conversations they can read; the handler deletes only what is theirs
   { methods: ["GET"], path: /^\/api\/published-apps(?:\/framing)?$/ },
   { methods: ["POST"], path: /^\/api\/published-apps\/delete$/ },
+  // a Team Cloud's shared folder: every member reads and adds; the handler lets a member delete or rename only what they
+  // uploaded (routes/team-files.ts); off a Team Cloud they answer 404
+  { methods: ["GET"], path: /^\/api\/team-files(?:\/file)?$/ },
+  { methods: ["PUT"], path: /^\/api\/team-files\/file$/ },
+  { methods: ["POST"], path: /^\/api\/team-files\/(?:folder|rename|delete)$/ },
+  // Slack for Clouds: the Admin calls these with the member's own session, and the handler answers each as that member
+  // alone, on a personal Cloud its owner alone (routes/team-slack.ts); off a Cloud they answer 404
+  { methods: ["GET"], path: /^\/api\/slack\/team\/bots$/ },
+  { methods: ["POST"], path: /^\/api\/slack\/team\/messages(?:\/[0-9a-f-]{36}\/stop)?$/ },
 ];
 
 export function requiredScope(method: string, path: string, features: { sharedComputers?: boolean } = {}): Scope {
@@ -612,7 +626,7 @@ function mutatingPublicRoute(method: string, path: string): boolean {
   // Hands out what a Grok Bot wrote about the person, from their Downloads folder.
   if (upper === "GET" && path === "/api/setup-import/grok") return true;
   // Drives a bot's browser: a WebSocket upgrade is a GET, but what it carries is input.
-  if (/^\/api\/bots\/[\w-]+\/browser\/stream$/.test(path)) return true;
+  if (/^\/api\/bots\/[\w-]+\/browser\/(?:stream|desktop)$/.test(path)) return true;
   // Shows the bots' USB phone: a WebSocket upgrade is a GET that a local process could send without an Origin.
   if (/^\/api\/usb-phones\/[^/]+\/stream$/.test(path)) return true;
   if (["GET", "HEAD", "OPTIONS"].includes(upper)) return false;

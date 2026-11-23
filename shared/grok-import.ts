@@ -64,6 +64,13 @@ If it is too long for one message or file, split it: send several documents, eac
 
 export type GrokImportErrorCode = "notExport" | "cutOff" | "tooLarge" | "credentials" | "newerVersion" | "unusable";
 
+/** Why a moved Bot's chat didn't come over from the Grok Bot app on this computer: the app isn't here, no Bot or several
+ * Bots there have its name, or it has no chat saved. */
+export const GROK_HISTORY_REASONS = ["noApp", "noMatch", "ambiguous", "empty"] as const;
+export type GrokHistoryReason = typeof GROK_HISTORY_REASONS[number];
+/** The answer to POST /api/setup-import/grok/history: how many messages of the Bot's chat are in its thread here. */
+export type GrokHistoryAnswer = { messages: number } | { reason: GrokHistoryReason };
+
 export class GrokImportError extends Error {
   readonly code: GrokImportErrorCode;
   /** The credential-looking keys, for "credentials". */
@@ -286,6 +293,28 @@ export function parseGrokExport(text: string): GrokBot[] {
   const bots = mergeGrokBots(raw.map(readBot).filter((bot) => bot.name).map((bot) => redactStrings(bot)));
   if (!bots.length) throw new GrokImportError("notExport");
   return bots;
+}
+
+/** Bots as one export document holding only what parseGrokExport reads from it: what a service that carries an
+ * export keeps, in place of the text it was sent. An app's header values are never read, so only the names go. */
+export function grokExportDocument(bots: readonly GrokBot[]): Record<string, unknown> {
+  return {
+    format: GROK_EXPORT_FORMAT,
+    version: 1,
+    bots: bots.map((bot) => ({
+      name: bot.name, title: bot.title, description: bot.description, instructions: bot.instructions,
+      memories: bot.memories, user_facts: bot.userFacts, skills: bot.skills,
+      routines: bot.routines.map((routine) => ({
+        name: routine.name, instruction: routine.instruction, trigger: routine.trigger, schedule_cron: routine.cron,
+        schedule_text: routine.when, timezone: routine.timeZone, paused: routine.paused, skills: routine.skills,
+        trigger_details: routine.details,
+      })),
+      apps: bot.apps.map((app) => ({
+        name: app.name, mcp_url: app.mcpUrl, transport: app.transport,
+        ...(app.headerNames.length ? { headers: Object.fromEntries(app.headerNames.map((header) => [header, ""])) } : {}),
+      })),
+    })),
+  };
 }
 
 const slug = (value: string, max: number) =>

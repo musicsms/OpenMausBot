@@ -29,6 +29,20 @@ export interface PairedDevice {
   e2eAt?: number;
 }
 
+/** POST /api/pair's body. A computer, a server and a Cloud all accept it; fields one does not know are ignored. */
+export interface PairRequest {
+  /** The QR's `omb_pair_` credential or the typed code. */
+  credential: string;
+  deviceName: string;
+  /** Lets the same request, retried through another address within the pairing window, get the same reply. */
+  pairRequestId?: string;
+  /** The device token this phone already holds for this same computer. A computer removes that device as it pairs
+   * the new one, so re-pairing never adds to its list; the new device starts with a fresh pairing's grants but keeps a
+   * Wi-Fi-and-Tailscale-only restriction. A token it does not know changes nothing, and the reply never says which.
+   * A server or Cloud ignores it. */
+  replacesToken?: string;
+}
+
 /** POST /api/pair: 201 from a computer's companion, 200 from a server or Cloud. */
 export interface PairResponse {
   token: string;
@@ -74,7 +88,9 @@ export interface WireComputerControl {
   help?: ComputerHelpRef;
 }
 
-/** GET /api/bots?messages=N: the fleet, each bot and room with the newest page of its selected conversation. */
+/** GET /api/bots?messages=N: the fleet, each bot and room with the newest page of its selected conversation. With
+ * `&tail=T&open=ID,…`, a bot not named in `open` carries only the newest T or more of those rows (`hasMore` true when
+ * rows were left out), reaching back to every line a client reads from a conversation it is not showing. */
 export interface BotsResponse<Message = WireMessage> {
   bots: Array<WireBot & WireMessagePage<Message>>;
   botQueuedMessages: BotQueuedMessages;
@@ -82,6 +98,8 @@ export interface BotsResponse<Message = WireMessage> {
   groups: Array<WireGroup & WireMessagePage<Message>>;
   /** By bot id. */
   computerControl: Record<string, WireComputerControl>;
+  /** What this place's page does when the person's other place asks: `newBot`, it makes a new bot. */
+  together?: { newBot: true };
 }
 
 /** One match in GET /api/search, in a bot's conversation (`botId`) or a room's (`groupId`). */

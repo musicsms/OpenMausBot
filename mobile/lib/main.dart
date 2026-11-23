@@ -13,17 +13,17 @@ import 'features/pairing/pairing_model.dart';
 import 'features/pairing/pairing_view.dart';
 
 void main() {
-  runApp(const MausBotApp());
+  runApp(const NibbleApp());
 }
 
-class MausBotApp extends StatefulWidget {
+class NibbleApp extends StatefulWidget {
   final PairingStorage? storage;
   final SseNetworkClient? sseClient;
   final Widget? scannerWidget;
   final String deviceName;
   final http.Client? httpClient;
 
-  const MausBotApp({
+  const NibbleApp({
     super.key,
     this.storage,
     this.sseClient,
@@ -33,10 +33,10 @@ class MausBotApp extends StatefulWidget {
   });
 
   @override
-  State<MausBotApp> createState() => _MausBotAppState();
+  State<NibbleApp> createState() => _NibbleAppState();
 }
 
-class _MausBotAppState extends State<MausBotApp> {
+class _NibbleAppState extends State<NibbleApp> {
   late final PairingStorage _storage;
   SseNetworkClient? _sseClient;
   String? _deviceToken;
@@ -294,7 +294,7 @@ class _MausBotAppState extends State<MausBotApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'OpenMausBot',
+      title: 'Nibble',
       theme: GrokTheme.themeData,
       home: _buildHome(),
     );

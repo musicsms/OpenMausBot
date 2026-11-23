@@ -86,7 +86,7 @@ const device = async (
 
 /** fetch will not set a Host header */
 const CONTROL_TOKEN = "fixture-control-token";
-const controlHeaders = { "x-openmausbot-control-token": CONTROL_TOKEN };
+const controlHeaders = { "x-nibble-control-token": CONTROL_TOKEN };
 
 const withHost = (port: number, host: string, path = "/api/health", headers: Record<string, string> = {}) =>
   new Promise<number>((resolve, reject) => {
@@ -242,7 +242,7 @@ describe("the sidecar in front of an unmodified harness", () => {
   it("serves a minimal, non-cacheable companion health identity", async () => {
     const health = await device("GET", "/api/health", { token: null });
     expect(health.status).toBe(200);
-    expect(health.body).toEqual({ app: "openmausbot" });
+    expect(health.body).toEqual({ app: "nibble" });
     expect(health.headers.get("cache-control")).toBe("private, no-store");
     expect(health.headers.get("cdn-cache-control")).toBe("no-store");
     expect(JSON.stringify(health.body)).not.toContain("pid");
@@ -250,9 +250,9 @@ describe("the sidecar in front of an unmodified harness", () => {
   });
 
   it("tells a paired device the desktop's version, and nobody else", async () => {
-    expect(await fetch(`${HARNESS}/api/health`).then((reply) => reply.json())).toMatchObject({ app: "openmausbot", version: DESKTOP_VERSION });
-    expect((await device("GET", "/api/health")).body).toEqual({ app: "openmausbot", version: DESKTOP_VERSION });
-    expect((await device("GET", "/api/health", { token: "omb_wrong" })).body).toEqual({ app: "openmausbot" });
+    expect(await fetch(`${HARNESS}/api/health`).then((reply) => reply.json())).toMatchObject({ app: "nibble", version: DESKTOP_VERSION });
+    expect((await device("GET", "/api/health")).body).toEqual({ app: "nibble", version: DESKTOP_VERSION });
+    expect((await device("GET", "/api/health", { token: "omb_wrong" })).body).toEqual({ app: "nibble" });
     expect((await device("GET", "/api/companion/endpoints")).body).toEqual({ serverName: "Test computer", endpoints: [], version: DESKTOP_VERSION });
   });
 
@@ -400,7 +400,7 @@ describe("the sidecar in front of an unmodified harness", () => {
     const { body } = await device("GET", "/api/bots");
     const bot = body.bots[0];
     const refused = await device("PATCH", `/api/bots/${bot.id}`, {
-      headers: { "x-openmausbot-companion": "0" },
+      headers: { "x-nibble-companion": "0" },
       body: { color: "coral", autoApprove: true },
     });
     expect(refused.status).toBe(403);
@@ -784,7 +784,7 @@ describe("pairing, end to end", () => {
       devices: registry,
       controlToken: () => CONTROL_TOKEN,
       companionPort: port,
-      discovery: () => ({ advertising: false, name: "OpenMausBot" }),
+      discovery: () => ({ advertising: false, name: "Nibble" }),
       connectedDeviceIds: connections.ids,
       disconnectDevice: connections.disconnect,
     });
@@ -900,7 +900,7 @@ describe("pairing, end to end", () => {
       devices: new DeviceRegistry(),
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "OpenMausBot" }),
+      discovery: () => ({ advertising: false, name: "Nibble" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;
@@ -925,7 +925,7 @@ describe("pairing, end to end", () => {
       devices: new DeviceRegistry(),
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "OpenMausBot" }),
+      discovery: () => ({ advertising: false, name: "Nibble" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;
@@ -949,7 +949,7 @@ describe("pairing, end to end", () => {
       devices: registry,
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "OpenMausBot" }),
+      discovery: () => ({ advertising: false, name: "Nibble" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;
@@ -993,7 +993,7 @@ describe("pairing, end to end", () => {
       devices: registry,
       controlToken: () => CONTROL_TOKEN,
       companionPort: 8800,
-      discovery: () => ({ advertising: false, name: "OpenMausBot" }),
+      discovery: () => ({ advertising: false, name: "Nibble" }),
     });
     await new Promise<void>((r) => control.listen(0, "127.0.0.1", r));
     const port = (control.address() as { port: number }).port;

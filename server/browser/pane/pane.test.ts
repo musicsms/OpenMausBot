@@ -390,7 +390,7 @@ describe("deleting a bot's browser with the pane", () => {
     backend.erase("bot:b");
     expect(main.toMain.some((message) => message.op === "erase")).toBe(false);
     backend.erase("bot:a");
-    expect(main.toMain.filter((message) => message.op === "erase")).toEqual([{ type: "openmausbot:browser-pane", op: "erase", partition: main.partitions[0] }]);
+    expect(main.toMain.filter((message) => message.op === "erase")).toEqual([{ type: "nibble:browser-pane", op: "erase", partition: main.partitions[0] }]);
     expect(backend.used("bot:a")).toBe(false);
   });
 });
@@ -508,8 +508,8 @@ describe("the pane link", () => {
     main.post({ op: "which", req: 2, botId: "b", threadId: "t-1" });
     await sleep(5);
     expect(main.toMain).toEqual([
-      { type: "openmausbot:browser-pane", op: "resolved", req: 1, browser: "bot:a" },
-      { type: "openmausbot:browser-pane", op: "resolved", req: 2, browser: null },
+      { type: "nibble:browser-pane", op: "resolved", req: 1, browser: "bot:a" },
+      { type: "nibble:browser-pane", op: "resolved", req: 2, browser: null },
     ]);
     expect(() => main.post({ op: "which", req: 3, botId: "a b", threadId: null })).toThrow(/malformed/);
   });

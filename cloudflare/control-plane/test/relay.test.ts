@@ -89,7 +89,7 @@ describe("relay host tokens", () => {
 
   it("answer 503 relay_unavailable until the signing key exists, and while the kill switch is on", async () => {
     const { credential } = await installation("unset@example.test");
-    for (const testEnv of [env, relayEnv({ RELAY_DISABLED: "1" }), relayEnv({ RELAY_NODES: "relay.example.com" })]) {
+    for (const testEnv of [env, relayEnv({ RELAY_DISABLED: "1" }), relayEnv({ RELAY_NODES: "localhost" })]) {
       const response = await ask(testEnv, credential);
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({ error: "relay_unavailable" });
@@ -100,7 +100,7 @@ describe("relay host tokens", () => {
     const { credential, id } = await installation("mint@example.test");
     const before = Math.floor(Date.now() / 1000);
     // Two nodes, whatever wrangler.jsonc lists today, so the order is still tested.
-    const twoNodes = relayEnv({ RELAY_NODES: "relay1.openmausbot.com,relay2.openmausbot.com" });
+    const twoNodes = relayEnv({ RELAY_NODES: "relay1.example.com,relay2.example.com" });
     const first = await (await ask(twoNodes, credential)).json<Issued>();
     const second = await (await ask(twoNodes, credential)).json<Issued>();
     expect(second.hostId).toBe(first.hostId);
@@ -113,7 +113,7 @@ describe("relay host tokens", () => {
     expect(claims.iat as number).toBeGreaterThanOrEqual(before);
     expect(first.expiresAt).toBe((claims.exp as number) * 1000);
     expect(first.refreshAfter).toBe(((claims.iat as number) + 3600) * 1000);
-    expect(first.nodes).toEqual(await orderNodes(fromB64u(first.hostId), { nodes: ["relay1.openmausbot.com", "relay2.openmausbot.com"], americasNodes: new Set() }, null));
+    expect(first.nodes).toEqual(await orderNodes(fromB64u(first.hostId), { nodes: ["relay1.example.com", "relay2.example.com"], americasNodes: new Set() }, null));
   });
 
   it("admit by rollout bucket, or by name, and never a blocked installation", async () => {
@@ -203,7 +203,7 @@ describe("relay usage per UTC day", () => {
 });
 
 describe("node order", () => {
-  const nodes = ["relay1.openmausbot.com", "relay2.openmausbot.com", "relay3.openmausbot.com"];
+  const nodes = ["relay1.example.com", "relay2.example.com", "relay3.example.com"];
 
   it("is the rendezvous hash: highest SHA256(hostId ‖ node)[0:8] first", async () => {
     const hostId = crypto.getRandomValues(new Uint8Array(16));
@@ -217,8 +217,8 @@ describe("node order", () => {
 
   it("puts an Americas node first for a computer in the Americas only", async () => {
     const hostId = crypto.getRandomValues(new Uint8Array(16));
-    const settings = { nodes, americasNodes: new Set(["relay3.openmausbot.com"]) };
-    expect((await orderNodes(hostId, settings, "SA"))[0]).toBe("relay3.openmausbot.com");
+    const settings = { nodes, americasNodes: new Set(["relay3.example.com"]) };
+    expect((await orderNodes(hostId, settings, "SA"))[0]).toBe("relay3.example.com");
     expect(await orderNodes(hostId, settings, "EU")).toEqual(await orderNodes(hostId, { nodes, americasNodes: new Set() }, null));
   });
 });
@@ -271,7 +271,7 @@ describe("a Worker deployed before migration 0012", () => {
     const health = await call(oldEnv, "/healthz", { method: "GET" });
     expect(health.status).toBe(200);
     const body = await health.json<Record<string, unknown>>();
-    expect(body).toMatchObject({ ok: true, service: "openmausbot-control-plane" });
+    expect(body).toMatchObject({ ok: true, service: "nibble-control-plane" });
     expect(body).not.toHaveProperty("relayAdoption");
 
     const token = await ask(oldEnv, credential);

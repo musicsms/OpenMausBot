@@ -467,7 +467,7 @@ describe.sequential("Composio Sessions", () => {
     setManagedBrokerAccess(null);
   });
   it("ignores credential sync without access and clears only on explicit null", () => {
-    const messageType = "openmausbot:managed-composio";
+    const messageType = "nibble:managed-composio";
     setManagedBrokerAccess({ url: "http://127.0.0.1:3210/", token: "a".repeat(64) });
 
     expect(applyManagedBrokerMessage({ type: messageType })).toBe(false);

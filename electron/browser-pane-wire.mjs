@@ -1,7 +1,7 @@
 // The messages the desktop main process and its own server exchange about the bots' browser panes, over the utility
 // process's parent port. Security: only Electron's main process can post on that port, so the port itself is the
 // authentication; every message is still checked here, on both sides, before anything acts on it.
-export const PANE_MESSAGE = "openmausbot:browser-pane";
+export const PANE_MESSAGE = "nibble:browser-pane";
 
 /** Tabs one profile's browser may have open, as for a launched Chrome. */
 export const PANE_TABS_PER_BROWSER = 8;

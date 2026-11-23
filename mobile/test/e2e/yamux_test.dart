@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:convert/convert.dart';
-import 'package:mobile/core/e2e/yamux.dart';
+import 'package:nibble/core/e2e/yamux.dart';
 
 Map<String, dynamic> _runScript(
   YamuxRole role,

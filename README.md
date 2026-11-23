@@ -1,12 +1,12 @@
 <div align="center">
 
-# OpenMausBot
+# Nibble
 
 **The open-source Grok Bot alternative: your own team of AI bots, in a chat app.**
 
 [**openmausbot.com**](https://www.openmausbot.com) &nbsp;·&nbsp; [Download](https://www.openmausbot.com/download) &nbsp;·&nbsp; [Open source Grok Bot alternative, compared](https://www.openmausbot.com/blog/grok-bot-vs-openmausbot)
 
-<sub>OpenMausBot is an open-source Grok Bot alternative: an independent project inspired by **Grok Bot**, and the open-source alternative to **Meta Muse**, **OpenAI dots** and **Cue by Manus** — bring-your-own-agent, local-first, on the models you already have. Also known as **MausBot**; formerly **OpenGrokBot**. Not affiliated with xAI, Meta, OpenAI or Manus.</sub>
+<sub>Nibble is an open-source Grok Bot alternative: an independent project inspired by **Grok Bot**, and the open-source alternative to **Meta Muse**, **OpenAI dots** and **Cue by Manus** — bring-your-own-agent, local-first, on the models you already have. Also known as **Nibble**; formerly **OpenGrokBot**. Not affiliated with xAI, Meta, OpenAI or Manus.</sub>
 
 Every bot in the sidebar is a real agent — Claude or Codex running locally under the hood — with its own
 personality, its own model, its own cloud computer, and its own connected apps.
@@ -16,33 +16,33 @@ Talk to them like contacts. Watch them work. Approve what matters.
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Electron](https://img.shields.io/badge/Electron-macOS%20%C2%B7%20Windows%20%C2%B7%20Ubuntu-2B2E3A?logo=electron&logoColor=9FEAF9)
 ![Agents](https://img.shields.io/badge/agents-Claude%20·%20Codex-d97757)
-[![Release](https://img.shields.io/github/v/release/milind-soni/OpenMausBot?label=release&color=1084fe&cacheSeconds=300)](https://github.com/milind-soni/OpenMausBot/releases/latest)
+[![Release](https://img.shields.io/github/v/release/milind-soni/Nibble?label=release&color=1084fe&cacheSeconds=300)](https://github.com/milind-soni/Nibble/releases/latest)
 ![PRs](https://img.shields.io/badge/PRs-welcome-38d591)
 
 <br>
 
-<a href="https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot.dmg">
-  <img src="https://img.shields.io/github/v/release/milind-soni/OpenMausBot?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Mac%20%28Apple%20silicon%29&labelColor=070707&color=1084fe&cacheSeconds=300" alt="Download the latest OpenMausBot for Mac with Apple silicon (.dmg)" height="40">
+<a href="https://github.com/milind-soni/Nibble/releases/latest/download/Nibble.dmg">
+  <img src="https://img.shields.io/github/v/release/milind-soni/Nibble?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Mac%20%28Apple%20silicon%29&labelColor=070707&color=1084fe&cacheSeconds=300" alt="Download the latest Nibble for Mac with Apple silicon (.dmg)" height="40">
 </a>
 &nbsp;
-<a href="https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-intel.dmg">
-  <img src="https://img.shields.io/github/v/release/milind-soni/OpenMausBot?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Mac%20%28Intel%29&labelColor=070707&color=2a9d8f&cacheSeconds=300" alt="Download the latest OpenMausBot for Intel Macs (.dmg)" height="40">
+<a href="https://github.com/milind-soni/Nibble/releases/latest/download/Nibble-intel.dmg">
+  <img src="https://img.shields.io/github/v/release/milind-soni/Nibble?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Mac%20%28Intel%29&labelColor=070707&color=2a9d8f&cacheSeconds=300" alt="Download the latest Nibble for Intel Macs (.dmg)" height="40">
 </a>
 &nbsp;
-<a href="https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-setup.exe">
-  <img src="https://img.shields.io/github/v/release/milind-soni/OpenMausBot?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Windows&labelColor=070707&color=4cc2ff&cacheSeconds=300" alt="Download the latest OpenMausBot for Windows (.exe)" height="40">
+<a href="https://github.com/milind-soni/Nibble/releases/latest/download/Nibble-setup.exe">
+  <img src="https://img.shields.io/github/v/release/milind-soni/Nibble?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Windows&labelColor=070707&color=4cc2ff&cacheSeconds=300" alt="Download the latest Nibble for Windows (.exe)" height="40">
 </a>
 &nbsp;
-<a href="https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-amd64.deb">
-  <img src="https://img.shields.io/github/v/release/milind-soni/OpenMausBot?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Ubuntu&labelColor=070707&color=e95420&cacheSeconds=300" alt="Download the latest OpenMausBot for Ubuntu (.deb)" height="40">
+<a href="https://github.com/milind-soni/Nibble/releases/latest/download/Nibble-amd64.deb">
+  <img src="https://img.shields.io/github/v/release/milind-soni/Nibble?style=for-the-badge&label=%E2%AC%87%EF%B8%8F%20%20Download%20for%20Ubuntu&labelColor=070707&color=e95420&cacheSeconds=300" alt="Download the latest Nibble for Ubuntu (.deb)" height="40">
 </a>
 
-<sub>[latest release](https://github.com/milind-soni/OpenMausBot/releases/latest) &nbsp;·&nbsp; macOS: Apple silicon & Intel · signed & notarized .dmg &nbsp;·&nbsp; Windows: x64 installer &nbsp;·&nbsp; Ubuntu 24.04 x64: .deb or AppImage beta &nbsp;·&nbsp; Fedora x64: .rpm &nbsp;·&nbsp; [all releases](https://github.com/milind-soni/OpenMausBot/releases)</sub>
+<sub>[latest release](https://github.com/milind-soni/Nibble/releases/latest) &nbsp;·&nbsp; macOS: Apple silicon & Intel · signed & notarized .dmg &nbsp;·&nbsp; Windows: x64 installer &nbsp;·&nbsp; Ubuntu 24.04 x64: .deb or AppImage beta &nbsp;·&nbsp; Fedora x64: .rpm &nbsp;·&nbsp; [all releases](https://github.com/milind-soni/Nibble/releases)</sub>
 
 <br>
 
 <a href="https://github.com/sponsors/milind-soni">
-  <img src="https://img.shields.io/badge/%E2%9D%A4%EF%B8%8F%20%20Support%20OpenMausBot-GitHub%20Sponsors-38d591?style=for-the-badge&labelColor=070707" alt="Support OpenMausBot via GitHub Sponsors" height="40">
+  <img src="https://img.shields.io/badge/%E2%9D%A4%EF%B8%8F%20%20Support%20Nibble-GitHub%20Sponsors-38d591?style=for-the-badge&labelColor=070707" alt="Support Nibble via GitHub Sponsors" height="40">
 </a>
 
 <br>
@@ -72,17 +72,17 @@ Talk to them like contacts. Watch them work. Approve what matters.
 <br>
 <br>
 
-<img src="docs/screenshots/hero.png" alt="OpenMausBot — a Telegram-style chat app where every chat is a real AI agent" width="900">
+<img src="docs/screenshots/hero.png" alt="Nibble — a Telegram-style chat app where every chat is a real AI agent" width="900">
 
 </div>
 
 ---
 
-> ⚠️ **No affiliation with any cryptocurrency.** OpenMausBot has no token. Any coin using the OpenMausBot, Maus, or SupaMaus name is not created, endorsed, or affiliated with this project or its maintainer. I have received no tokens, payment, or allocation from anyone, and I will not be endorsing any token.
+> ⚠️ **No affiliation with any cryptocurrency.** Nibble has no token. Any coin using the Nibble, Maus, or SupaMaus name is not created, endorsed, or affiliated with this project or its maintainer. I have received no tokens, payment, or allocation from anyone, and I will not be endorsing any token.
 
 ## Why
 
-One assistant in one box is the wrong shape for agents. OpenMausBot is an independent, open-source project inspired by **Grok Bot** —
+One assistant in one box is the wrong shape for agents. Nibble is an independent, open-source project inspired by **Grok Bot** —
 it keeps the idea (AI as a *messaging app*: a roster of bots you chat with, each with its own personality,
 memory of its thread, model, computer, and apps) and rebuilds it open, local-first, and on the agents you
 already have:
@@ -100,14 +100,14 @@ already have:
 ## The open-source alternative to Grok Bot, Muse, dots and Cue
 
 Four closed personal-agent products shipped in seven weeks of 2026, and each one keeps the model, the
-computer and your data on its maker's side of the line. OpenMausBot is the open-source version of that
+computer and your data on its maker's side of the line. Nibble is the open-source version of that
 shape: a team of agents in a chat app, each with its own model, its own computer and its own connected
 apps, running on your machine under Apache 2.0. If you searched for an *open Muse*, *open dots*, an
 *open-source Grok Bot*, an *open Instinct* or an *open Cue*, this is the repository.
 
-| Looking for | What it is | How OpenMausBot differs | Read more |
+| Looking for | What it is | How Nibble differs | Read more |
 | --- | --- | --- | --- |
-| **Open source Grok Bot** | xAI's roster of bots on one shared cloud computer, Grok only, from a SuperGrok or Cursor plan | Same roster shape; any model per bot; your own machine; approval cards | [Grok Bot vs OpenMausBot](https://www.openmausbot.com/blog/grok-bot-vs-openmausbot) |
+| **Open source Grok Bot** | xAI's roster of bots on one shared cloud computer, Grok only, from a SuperGrok or Cursor plan | Same roster shape; any model per bot; your own machine; approval cards | [Grok Bot vs Nibble](https://www.openmausbot.com/blog/grok-bot-vs-openmausbot) |
 | **Open Muse** | Meta's single personal agent in a Meta cloud VM, US and Canada only | A team instead of one agent; runs anywhere; data in `~/.openmausbot` | [Meta Muse alternative](https://www.openmausbot.com/blog/open-source-alternative-to-meta-muse) |
 | **Open dots** | OpenAI's always-on agent inside ChatGPT, GPT only, Pro and Business Premium plans | Several agents; your Claude, ChatGPT or Grok login; no plan required | [OpenAI dots alternative](https://www.openmausbot.com/blog/openai-dots-alternative) |
 | **Open Cue** | Manus's invite-only agents with their own phone, email and wallet | No invite; OAuth instead of passwords; open source | [Cue by Manus alternative](https://www.openmausbot.com/blog/open-source-alternative-to-cue-by-manus) |
@@ -201,12 +201,12 @@ See [docs/decision-model.md](docs/decision-model.md).
 
 ### 📦 Install a complete team from one Markdown file
 
-Browse outcome-driven teams on [BotMRR](https://botmrr.io), then choose **Add to OpenMausBot**. The app
+Browse outcome-driven teams on [BotMRR](https://botmrr.io), then choose **Add to Nibble**. The app
 opens a review screen before creating the bots, Chief of Staff, channels, playbooks, connector checklist,
 and suggested routines. You can also import the same `.md` file from disk or paste its public GitHub URL
 in **Teams → Import**.
 
-The format stays portable: OpenMausBot reads the structured YAML frontmatter for a reliable one-click
+The format stays portable: Nibble reads the structured YAML frontmatter for a reliable one-click
 install, while Grok, Claude, ChatGPT, and people can follow the ordinary Markdown playbook. Connections
 remain off until you approve them, routines arrive paused, and packages never carry credentials,
 conversations, permissions, memory, or computer access. Browse the
@@ -312,9 +312,9 @@ flowchart LR
 | App | `src/` | The chat shell. Server-backed store, one reducer, zero client-side transports. |
 | Desktop | `electron/` | macOS, Windows, and Ubuntu shells with an embedded harness and platform capabilities; Apple speech stays macOS-only, Ubuntu Xorg has opt-in local control, and Wayland remains fail-closed. |
 
-### Orchestrate OpenMausBot over MCP
+### Orchestrate Nibble over MCP
 
-OpenMausBot ships a stdio MCP server for external clients such as Claude Desktop and Cursor. It exposes a
+Nibble ships a stdio MCP server for external clients such as Claude Desktop and Cursor. It exposes a
 deliberately bounded team control plane: inspect bots and channels, read/search compact transcript pages,
 create and configure bots/channels/tasks, send work, wait for completion, switch models, and interrupt turns.
 It does **not** expose approval grants, deletion, arbitrary settings, credentials, or computer lifecycle.
@@ -333,19 +333,19 @@ openmausbot team apply team.yaml
 openmausbot run "Room Lead" "Rehearse the launch of https://example.com" --export ./out
 ```
 
-See [Run OpenMausBot from scripts and CI](docs/headless-cli.md).
+See [Run Nibble from scripts and CI](docs/headless-cli.md).
 
 ## Quick start
 
-**Released builds ([latest release](https://github.com/milind-soni/OpenMausBot/releases/latest)):** the harness server is embedded, so no separate server setup is required.
+**Released builds ([latest release](https://github.com/milind-soni/Nibble/releases/latest)):** the harness server is embedded, so no separate server setup is required.
 
 | | Download | Install |
 |---|---|---|
-| **macOS** (Apple silicon) | [OpenMausBot.dmg](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot.dmg) | Drag it to Applications, open it. Signed & notarized. |
-| **macOS** (Intel) | [OpenMausBot-intel.dmg](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-intel.dmg) | Same app, built for Intel Macs. Signed & notarized. |
-| **Windows** (x64) | [OpenMausBot-setup.exe](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-setup.exe) | Run it — one-click, per-user, no admin rights. The installer isn't code-signed yet, so SmartScreen shows "unknown publisher": **More info → Run anyway**. By default the app installs to `%LOCALAPPDATA%\Programs\OpenMausBot`, and every update goes back to the folder the installer recorded, so keep it where the installer put it: a copy moved by hand (for example from C: to D:) is left behind, and the next update lands in the recorded folder again. |
-| **Ubuntu 24.04** (x64) | [OpenMausBot-amd64.deb](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-amd64.deb) · [OpenMausBot.AppImage](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot.AppImage) | Install the `.deb` with APT (recommended), or make the AppImage executable and run it. Beta; GNOME is the supported desktop. |
-| **Fedora** (x64) | [OpenMausBot-x86_64.rpm](https://github.com/milind-soni/OpenMausBot/releases/latest/download/OpenMausBot-x86_64.rpm) | Install with `sudo dnf install ./OpenMausBot-x86_64.rpm`. Community-supported; Ubuntu is the tested Linux. |
+| **macOS** (Apple silicon) | [Nibble.dmg](https://github.com/milind-soni/Nibble/releases/latest/download/Nibble.dmg) | Drag it to Applications, open it. Signed & notarized. |
+| **macOS** (Intel) | [Nibble-intel.dmg](https://github.com/milind-soni/Nibble/releases/latest/download/Nibble-intel.dmg) | Same app, built for Intel Macs. Signed & notarized. |
+| **Windows** (x64) | [Nibble-setup.exe](https://github.com/milind-soni/Nibble/releases/latest/download/Nibble-setup.exe) | Run it — one-click, per-user, no admin rights. The installer isn't code-signed yet, so SmartScreen shows "unknown publisher": **More info → Run anyway**. By default the app installs to `%LOCALAPPDATA%\Programs\Nibble`, and every update goes back to the folder the installer recorded, so keep it where the installer put it: a copy moved by hand (for example from C: to D:) is left behind, and the next update lands in the recorded folder again. |
+| **Ubuntu 24.04** (x64) | [Nibble-amd64.deb](https://github.com/milind-soni/Nibble/releases/latest/download/Nibble-amd64.deb) · [Nibble.AppImage](https://github.com/milind-soni/Nibble/releases/latest/download/Nibble.AppImage) | Install the `.deb` with APT (recommended), or make the AppImage executable and run it. Beta; GNOME is the supported desktop. |
+| **Fedora** (x64) | [Nibble-x86_64.rpm](https://github.com/milind-soni/Nibble/releases/latest/download/Nibble-x86_64.rpm) | Install with `sudo dnf install ./Nibble-x86_64.rpm`. Community-supported; Ubuntu is the tested Linux. |
 
 See the [Ubuntu Desktop guide](docs/linux-desktop.md) for installation, capabilities, and troubleshooting.
 Any desktop build can also open the bots of another Windows, macOS, or Ubuntu computer over Tailscale; see [open one computer's bots from another computer](docs/desktop-companion.md).
@@ -354,7 +354,7 @@ Any desktop build can also open the bots of another Windows, macOS, or Ubuntu co
 **From source:**
 
 ```sh
-git clone https://github.com/milind-soni/OpenMausBot && cd OpenMausBot
+git clone https://github.com/milind-soni/Nibble && cd Nibble
 pnpm install
 
 pnpm dev:server    # harness server → 127.0.0.1:8799
@@ -393,9 +393,9 @@ The Linux preview is user-initiated and never enables local bot control or Auto 
 Driver 0.41.3 runtime starts only after explicit opt-in and without its full-screen cursor overlay. On Wayland the
 app never starts it and clears legacy opt-ins while that real-seat safety gate remains unresolved. Chat, preview,
 Cloud, and Local VM remain available on both sessions. See the [Ubuntu Desktop guide](docs/linux-desktop.md) and tracking
-issues [#29](https://github.com/milind-soni/OpenMausBot/issues/29),
-[#345](https://github.com/milind-soni/OpenMausBot/issues/345), and
-[#113](https://github.com/milind-soni/OpenMausBot/issues/113).
+issues [#29](https://github.com/milind-soni/Nibble/issues/29),
+[#345](https://github.com/milind-soni/Nibble/issues/345), and
+[#113](https://github.com/milind-soni/Nibble/issues/113).
 
 The Linux packager downloads only the tag-pinned upstream archive during the build, verifies its size, SHA-256,
 complete member allowlist, and inner executable hashes, then packages only the CLI and cursor-theme sidecar. The
@@ -408,7 +408,7 @@ in the sidebar footer) when you want to enable its integration:
 
 | Credential | What it enables | Where to get it |
 |---|---|---|
-| Composio project key (`ak_…`) | Connect Gmail, GitHub, Slack, Notion, and other apps to your bots | [OpenMausBot Composio setup](docs/composio.md) |
+| Composio project key (`ak_…`) | Connect Gmail, GitHub, Slack, Notion, and other apps to your bots | [Nibble Composio setup](docs/composio.md) |
 | Boat API key | Give bots an isolated remote Linux computer with a desktop and terminal | [Boat API key guide](https://docs.boat.dev/api-keys) |
 | ElevenLabs key | Read replies aloud, and call your bots | [ElevenLabs API keys](https://elevenlabs.io/app/settings/api-keys) |
 | Fish Audio key | Read replies aloud with Fish Audio voices, and call your bots | [Fish Audio API keys](https://fish.audio/app/api-keys/) |
@@ -445,18 +445,18 @@ receipts.
 **App events** start a bot when something happens in a connected app ("whenever I get an email from Acme, draft
 a reply"). The bot finds the app's events with `trigger_info` (`action: "events"`) and calls `trigger` with
 `action: "create"` and `when: "app_event"`; the person can also choose **New → Set it up yourself → When something happens in an app**.
-Composio sends each event to OpenMausBot's connected-apps service, which queues it; the app collects the queue
+Composio sends each event to Nibble's connected-apps service, which queues it; the app collects the queue
 with a long poll, so a desktop needs no public address and events wait while it is closed. Gmail is checked every
 15 minutes; Slack, GitHub and other push apps arrive at once. A desktop keeps up to 500 events a day and a paid
 Cloud 2,000; what is skipped shows on the automation. App events need the included connected apps: a server
 using its own Composio key cannot watch apps yet. Details: [docs/composio.md](docs/composio.md#app-events).
 
-OpenMausBot starts a webhook-only receiver on `127.0.0.1:8800` by default (or one port above `OMB_PORT`).
+Nibble starts a webhook-only receiver on `127.0.0.1:8800` by default (or one port above `OMB_PORT`).
 Set `OMB_WEBHOOK_PORT` to choose another port. A webhook secret is shown once when the trigger is created
 or rotated. Bearer authentication is recommended so the secret stays out of request URLs and most access
 logs; a single capability URL remains available for senders that cannot configure headers. The receiver
 exposes only `/health` and secret `/hooks/...` endpoints; it never exposes the app's broader API.
-OpenMausBot must remain running to accept a delivery. For public internet delivery, proxy only this
+Nibble must remain running to accept a delivery. For public internet delivery, proxy only this
 dedicated receiver through a hosted relay or a tool such as Tailscale Funnel.
 
 ## Status
@@ -484,10 +484,10 @@ names, addresses or conversations. Turn them off in Settings → General → Usa
 
 ## Support the project
 
-OpenMausBot is free and open source. If it does real work for you, you can
+Nibble is free and open source. If it does real work for you, you can
 [support its development through GitHub Sponsors](https://github.com/sponsors/milind-soni)
 with a one-time contribution or a monthly sponsorship. Your support helps fund ongoing development
-and maintenance; OpenMausBot remains free and open source.
+and maintenance; Nibble remains free and open source.
 
 ## Run from a terminal or on a server
 
@@ -501,7 +501,7 @@ openmausbot
 Or use `npx openmausbot` without a global install. First launch guides you with
 arrow-key choices: choose AI access, sign in or paste a hidden API key, choose
 a model, and optionally connect a phone. Next time, the same command reuses your
-saved setup and opens OpenMausBot on this computer. Keep the terminal open; Ctrl-C stops
+saved setup and opens Nibble on this computer. Keep the terminal open; Ctrl-C stops
 the server, not your saved work. Use `--no-open` to skip opening the browser.
 
 Phone access is optional and defaults to skipping. Choose an explicitly
@@ -533,7 +533,7 @@ For a server on a VPS or an always-on computer, run `npx openmausbot serve`
 with one way in: `--public-url` behind your own cloudflared, Caddy or nginx,
 `--domain` for a certificate on your own domain, `--tailscale` for your
 tailnet, `--lan` for this network only, or `--tunnel` (after
-`npx openmausbot account login`) for a free MausBot web address. It prints one
+`npx openmausbot account login`) for a free Nibble web address. It prints one
 pairing link; paste it into the desktop app under **＋ → Connect to a
 server**. The short path for each install method (npx, Docker, a service) is
 at the top of [docs/self-hosting.md](docs/self-hosting.md); a server from
@@ -541,7 +541,7 @@ scratch is [docs/deploy-vps.md](docs/deploy-vps.md).
 
 ## License
 
-[Apache License 2.0](LICENSE) © 2026 Milind Soni and OpenMausBot contributors,
+[Apache License 2.0](LICENSE) © 2026 Milind Soni and Nibble contributors,
 except `enterprise/`, which is source-available under its
 [own license](enterprise/LICENSE); delete that folder and what remains is the
 open-source edition. Details, including how contributions are signed off, are
@@ -551,6 +551,6 @@ Packaged Cua Driver components retain their upstream MIT, SIL OFL 1.1, MPL-2.0, 
 the corresponding notices, license texts, source locations, and SBOM are in
 [`third_party/cua-driver/`](third_party/cua-driver/) and ship beside the native runtime.
 
-OpenMausBot is an independent, open-source project inspired by Grok Bot. It is
+Nibble is an independent, open-source project inspired by Grok Bot. It is
 not affiliated with, endorsed by, or associated with xAI; "Grok" is a trademark
 of its respective owner.

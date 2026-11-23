@@ -119,7 +119,7 @@ describe("the stored choice", () => {
     setAnalyticsEnabled(true);
     expect(analyticsEnabled()).toBe(true);
     // Let init finish here rather than write the install marker into the next test.
-    await initAnalytics();
+    await initAnalytics("phc_test");
   });
 
   it("holds an opt-out for the session even when the write is rejected", async () => {
@@ -133,7 +133,7 @@ describe("the stored choice", () => {
 
     fresh.setAnalyticsEnabled(false);
     expect(fresh.analyticsEnabled()).toBe(false);
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.loads).toBe(0);
     expect(store.get("omb-installed")).toBeUndefined();
   });
@@ -158,7 +158,7 @@ describe("initAnalytics while opted out", () => {
     const fresh = await freshAnalytics();
 
     expect(fresh.analyticsEnabled()).toBe(false);
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     fresh.track("onboarding_step");
 
     expect(ph.loads).toBe(0);
@@ -171,13 +171,13 @@ describe("loading the client", () => {
   it("leaves posthog-js out of the startup bundle until initAnalytics runs", async () => {
     const fresh = await freshAnalytics();
     expect(ph.loads).toBe(0);
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.loads).toBe(1);
   });
 
   it("says which app sent every event, and from which page, before the first one", async () => {
     const fresh = await freshAnalytics();
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.registered).toEqual([{ app_version: appVersion(), surface: "server", platform: "browser" }]);
     expect(appVersion()).toMatch(/^\d+\.\d+\.\d+/);
     expect(ph.calls.indexOf("register")).toBeLessThan(ph.calls.indexOf("capture app_first_open"));
@@ -188,10 +188,10 @@ describe("loading the client", () => {
 
   it("initialises once, with autocapture, surveys and feature flags off", async () => {
     const fresh = await freshAnalytics();
-    const first = fresh.initAnalytics();
-    expect(fresh.initAnalytics()).toBe(first);
+    const first = fresh.initAnalytics("phc_test");
+    expect(fresh.initAnalytics("phc_test")).toBe(first);
     await first;
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
 
     expect(ph.calls).toEqual(OPENED);
     expect(ph.options).toHaveLength(1);
@@ -200,14 +200,14 @@ describe("loading the client", () => {
 
   it("forgets the first page's address that PostHog stored for the person", async () => {
     const fresh = await freshAnalytics();
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.unregistered).toEqual(["$initial_person_info", "$initial_referrer_info", "$initial_campaign_params"]);
   });
 
   it("opts back in without PostHog's own $opt_in event, at start and from Settings", async () => {
     ph.storedOptOut = true;
     const fresh = await freshAnalytics();
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     fresh.setAnalyticsEnabled(false);
     fresh.setAnalyticsEnabled(true);
     expect(ph.calls.filter((call) => call.startsWith("opt_"))).toEqual(["opt_in_capturing", "opt_out_capturing", "opt_in_capturing"]);
@@ -216,7 +216,7 @@ describe("loading the client", () => {
 
   it("sends no address: no URL, host, path, referrer or campaign, on the event or on the person", async () => {
     const fresh = await freshAnalytics();
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.options[0]).toMatchObject({ save_referrer: false, save_campaign_params: false, disable_capture_url_hashes: true });
     const beforeSend = ph.options[0]!.before_send as (event: unknown) => unknown;
     const page = "https://ada-tenant.mausbot.cloud/?share-computer=cmp_123&utm_source=hn#copy-to";
@@ -250,7 +250,7 @@ describe("loading the client", () => {
 
   it("delivers calls made while it loads once each, after app_opened, in order", async () => {
     const fresh = await freshAnalytics();
-    const loading = fresh.initAnalytics();
+    const loading = fresh.initAnalytics("phc_test");
     fresh.track("onboarding_step", { step: "hello" });
     fresh.track("onboarding_done");
     await loading;
@@ -261,13 +261,13 @@ describe("loading the client", () => {
   it("drops calls made before initAnalytics, as before", async () => {
     const fresh = await freshAnalytics();
     fresh.track("too_early");
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.calls).toEqual(OPENED);
   });
 
   it("never initialises, and drops the queued events, when switched off mid-load", async () => {
     const fresh = await freshAnalytics();
-    const loading = fresh.initAnalytics();
+    const loading = fresh.initAnalytics("phc_test");
     fresh.track("onboarding_step");
     fresh.setAnalyticsEnabled(false);
     await loading;
@@ -276,19 +276,19 @@ describe("loading the client", () => {
     expect(store.get("omb-installed")).toBeUndefined();
 
     fresh.setAnalyticsEnabled(true);
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.calls).toEqual(OPENED);
   });
 
   it("initialises once when switched off and on again mid-load", async () => {
     const fresh = await freshAnalytics();
-    const loading = fresh.initAnalytics();
+    const loading = fresh.initAnalytics("phc_test");
     fresh.track("before_off");
     fresh.setAnalyticsEnabled(false);
     fresh.setAnalyticsEnabled(true);
     fresh.track("after_on");
     await loading;
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
 
     expect(ph.loads).toBe(1);
     expect(ph.calls).toEqual([...OPENED, "capture after_on"]);
@@ -296,7 +296,7 @@ describe("loading the client", () => {
 
   it("stops a running client when switched off", async () => {
     const fresh = await freshAnalytics();
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     fresh.setAnalyticsEnabled(false);
     fresh.track("after_off");
 
@@ -306,7 +306,7 @@ describe("loading the client", () => {
   it("stays off without throwing when the library fails to load", async () => {
     ph.fail = true;
     const fresh = await freshAnalytics();
-    const loading = fresh.initAnalytics();
+    const loading = fresh.initAnalytics("phc_test");
     fresh.track("onboarding_step");
     await expect(loading).resolves.toBeUndefined();
     fresh.track("after_failure");
@@ -314,21 +314,21 @@ describe("loading the client", () => {
 
     ph.fail = false;
     fresh.setAnalyticsEnabled(true);
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.calls).toEqual(OPENED);
   });
 
   it("settles quietly, and drops the queue, when the library throws while starting", async () => {
     ph.initThrows = true;
     const fresh = await freshAnalytics();
-    const loading = fresh.initAnalytics();
+    const loading = fresh.initAnalytics("phc_test");
     fresh.track("while_starting");
     await expect(loading).resolves.toBeUndefined();
     fresh.track("after_failure");
     expect(ph.calls).toEqual([]);
 
     ph.initThrows = false;
-    await fresh.initAnalytics();
+    await fresh.initAnalytics("phc_test");
     expect(ph.calls).toEqual(OPENED);
   });
 });
@@ -354,7 +354,7 @@ describe("app_active", () => {
         vi.clearAllTimers();
         vi.setSystemTime(now);
         const analytics = await freshAnalytics();
-        await analytics.initAnalytics();
+        await analytics.initAnalytics("phc_test");
         return analytics;
       },
     };

@@ -42,7 +42,7 @@ const owner = async (path: string, init: RequestInit = {}) => {
 describe("serve --relay", () => {
   it("pairs a phone through the relay with the server's own pairing code, as a session of its own", async () => {
     await waitFor(async () => (await owner("/api/auth/pairing")).body.relay?.relay === "connected", 15_000);
-    expect(readFileSync(logPath, "utf8")).toContain("phone relay: connected via relay1.openmausbot.com");
+    expect(readFileSync(logPath, "utf8")).toContain("phone relay: connected via relay1.example.com");
     // The control plane hears exactly the fields its strict schema takes.
     expect(tokenRequests[0]).toEqual({ appVersion: expect.stringMatching(/^\d+\.\d+\.\d+/), devices: { e2e: 0, legacy: 0 }, kind: "server" });
 
@@ -52,7 +52,7 @@ describe("serve --relay", () => {
     const invite = new URL(minted.body.inviteUrl);
     expect(invite.searchParams.get("token")).toBe(minted.body.credential);
     const descriptor = JSON.parse(fromB64u(invite.searchParams.get("e2e")!)!.toString("utf8")) as { k: string; h: string; r: string[] };
-    expect(descriptor).toMatchObject({ h: b64u(hostId), r: ["relay1.openmausbot.com"] });
+    expect(descriptor).toMatchObject({ h: b64u(hostId), r: ["relay1.example.com"] });
     const k = fromB64u(descriptor.k)!;
     const phone = (token: string) => dial({
       url: `${relay.url}/v1/phone`, transportByte: TRANSPORT_RELAY, remoteStatic: k, psk: psk(credentialHash(token), keyId(k)), app: "test/1",
@@ -70,7 +70,7 @@ describe("serve --relay", () => {
     const session = await waitFor(() => phone(reply.token).catch(() => null), 8_000);
     expect(json(await http(session, "GET", "/api/auth/session", { token: reply.token }))).toMatchObject({ kind: "session", id: reply.device.id, scopes: ["client"] });
     // No session, a loopback Host and the CLI's owner header: still a remote request through the relay.
-    const spoofed = await http(session, "GET", "/api/auth/session", { headers: { host: base.slice("http://".length), "x-openmausbot-cli": "1" } });
+    const spoofed = await http(session, "GET", "/api/auth/session", { headers: { host: base.slice("http://".length), "x-nibble-cli": "1" } });
     expect(spoofed.status).toBe(403);
     // Chat-only stays chat-only: the server's own scope rule answers.
     expect((await http(session, "POST", "/api/auth/pairing", { token: reply.token, body: "{}", headers: { "content-type": "application/json" } })).status).toBe(403);

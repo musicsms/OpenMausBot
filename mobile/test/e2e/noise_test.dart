@@ -3,8 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:convert/convert.dart';
-import 'package:mobile/core/e2e/crypto.dart';
-import 'package:mobile/core/e2e/noise.dart';
+import 'package:nibble/core/e2e/crypto.dart';
+import 'package:nibble/core/e2e/noise.dart';
 
 void main() {
   final vectorFile = File('../companion/src/e2e/vectors/v1.json');

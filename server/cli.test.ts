@@ -120,7 +120,7 @@ describe("openmausbot command line", () => {
     });
 
     it("gives an Android phone the app-scheme QR, because its scanner rejects https", () => {
-      const invite = `openmausbot://pair?address=https%3A%2F%2Fmini.example&token=omb_pair_${"a".repeat(43)}&name=mini`;
+      const invite = `nibble://pair?address=https%3A%2F%2Fmini.example&token=omb_pair_${"a".repeat(43)}&name=mini`;
       const out = pairingBlock({ ...base, chatOnly: true, inviteUrl: invite, phone: "android" });
       expect(out).toContain(qrToString(invite));
       expect(out).not.toContain(qrToString(link));
@@ -187,7 +187,7 @@ describe("openmausbot command line", () => {
       expect(paired.stdout).toContain("Link           https://mini.example/pair#code=");
       expect(paired.stdout).toMatch(/[▀▄█]/);
       expect(paired.stdout).toContain("The code works once the address answers.");
-      const descriptor: any = await (await fetch(`http://127.0.0.1:${port}/.well-known/openmausbot/environment`)).json();
+      const descriptor: any = await (await fetch(`http://127.0.0.1:${port}/.well-known/nibble/environment`)).json();
       expect(descriptor.label).toBe("cli test");
       const pairing: any = await (await fetch(`http://127.0.0.1:${port}/api/auth/pairing`)).json();
       expect(pairing.pairings.length).toBeGreaterThanOrEqual(1);
@@ -519,7 +519,7 @@ describe.skipIf(process.platform === "win32")("serve --tunnel", () => {
       const gatewayDeadline = Date.now() + 20_000;
       while (Date.now() < gatewayDeadline && status !== 200) {
         try {
-          status = (await fetch(`${gateway}/.well-known/openmausbot/environment`)).status;
+          status = (await fetch(`${gateway}/.well-known/nibble/environment`)).status;
         } catch {
           status = 0;
         }
@@ -574,7 +574,7 @@ describe.skipIf(process.platform === "win32")("serve --tunnel", () => {
       const gatewayDeadline = Date.now() + 20_000;
       while (Date.now() < gatewayDeadline) {
         try {
-          descriptor = await fetch(`${gateway}/.well-known/openmausbot/environment`);
+          descriptor = await fetch(`${gateway}/.well-known/nibble/environment`);
           if (descriptor.status === 200) break;
         } catch {
           descriptor = null;
@@ -586,7 +586,7 @@ describe.skipIf(process.platform === "win32")("serve --tunnel", () => {
       const stranger = await fetch(`${gateway}/api/bots`);
       expect(stranger.status).toBe(403);
       expect(((await stranger.json()) as { error: string }).error).toMatch(/through a proxy/);
-      expect(await (await fetch(`${gateway}/api/health`)).json()).toEqual({ app: "openmausbot" });
+      expect(await (await fetch(`${gateway}/api/health`)).json()).toEqual({ app: "nibble" });
       expect(typeof ((await (await fetch(`http://127.0.0.1:${port}/api/health`)).json()) as { pid: unknown }).pid).toBe("number");
       const match = /Pairing code {3}([A-Z2-9-]+)/.exec(pairOut);
       expect(match).toBeTruthy();

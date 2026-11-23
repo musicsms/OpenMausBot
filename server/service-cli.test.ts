@@ -51,7 +51,7 @@ describe("openmausbot service", () => {
 
   it("writes a launchd agent on macOS and explains uninstall on both", () => {
     expect(runServiceCommand({ action: "install", dataDir: dir, port: 8799, tunnel: true, script: "/opt/homebrew/lib/node_modules/openmausbot/cli.js", node: "/opt/homebrew/bin/node", platform: "darwin", home: "/Users/maus" }, io)).toBe(0);
-    expect(readFileSync(join(dir, "com.openmausbot.serve.plist"), "utf8")).toContain("<string>--tunnel</string>");
+    expect(readFileSync(join(dir, "com.nibble.serve.plist"), "utf8")).toContain("<string>--tunnel</string>");
     expect(out.join("\n")).toContain("launchctl bootstrap");
     out.length = 0;
     expect(runServiceCommand({ action: "uninstall", dataDir: dir, port: 8799, script: "/x", node: "/n", platform: "linux" }, io)).toBe(0);
@@ -64,14 +64,14 @@ describe("openmausbot service", () => {
     const dataDir = join(dir, "data");
     const base = { action: "install" as const, dataDir, port: 8799, sentinel: true, sentinelOut, script: "/usr/lib/node_modules/openmausbot/cli.js", node: "/usr/bin/node", exists: () => false };
     expect(runServiceCommand({ ...base, platform: "darwin", home: "/Users/maus" }, io)).toBe(0);
-    const plist = readFileSync(join(sentinelOut, "com.openmausbot.sentinel.plist"), "utf8");
+    const plist = readFileSync(join(sentinelOut, "com.nibble.sentinel.plist"), "utf8");
     expect(plist).toContain("<string>sentinel</string>");
     expect(plist).toContain("<string>/usr/bin/node</string>");
     expect(plist).not.toContain("ELECTRON_RUN_AS_NODE");
     expect(plist).toContain(`<string>${sentinelOut}</string>`);
     expect(out.join("\n")).toContain("openmausbot sentinel --check-install");
     expect(existsSync(dataDir)).toBe(false);
-    expect(out.join("\n")).toContain("launchctl bootstrap gui/$(id -u) /Users/maus/Library/LaunchAgents/com.openmausbot.sentinel.plist");
+    expect(out.join("\n")).toContain("launchctl bootstrap gui/$(id -u) /Users/maus/Library/LaunchAgents/com.nibble.sentinel.plist");
     expect(out.join("\n")).toContain(`issues: ${join(sentinelOut, "issues.jsonl")}`);
 
     out.length = 0;
@@ -87,7 +87,7 @@ describe("openmausbot service", () => {
 
     // Windows gets a schtasks line, with the platform's own folder as --out
     expect(runServiceCommand({ ...base, sentinelOut: undefined, platform: "win32", dataDir: "C:\\Users\\maus\\.openmausbot", home: "C:\\Users\\maus", env: {} }, io)).toBe(1);
-    expect(err.join("\n")).toContain('schtasks /Create /SC MINUTE /MO 2 /TN "OpenMausBot Sentinel" /TR "\\"/usr/bin/node\\" \\"/usr/lib/node_modules/openmausbot/cli.js\\" \\"sentinel\\"');
+    expect(err.join("\n")).toContain('schtasks /Create /SC MINUTE /MO 2 /TN "Nibble Sentinel" /TR "\\"/usr/bin/node\\" \\"/usr/lib/node_modules/openmausbot/cli.js\\" \\"sentinel\\"');
     expect(err.join("\n")).toContain("\\\"--out\\\" \\\"C:\\Users\\maus\\AppData\\Local\\openmausbot-sentinel\\\"");
   });
 
@@ -109,11 +109,11 @@ describe("openmausbot service", () => {
 
   it("--sentinel prefers the installed app's own CLI over a checkout, which an update or Node upgrade would strand", () => {
     const sentinelOut = join(dir, "sentinel-state");
-    const app = "/Applications/OpenMausBot.app/Contents";
-    const checkout = { action: "install" as const, dataDir: join(dir, "data"), port: 8799, sentinel: true, sentinelOut, script: "/src/OpenMausBot/server/openmausbot.ts", node: "/home/maus/.nvm/versions/node/v24.0.0/bin/node", platform: "darwin" as const, home: "/Users/maus" };
+    const app = "/Applications/Nibble.app/Contents";
+    const checkout = { action: "install" as const, dataDir: join(dir, "data"), port: 8799, sentinel: true, sentinelOut, script: "/src/Nibble/server/openmausbot.ts", node: "/home/maus/.nvm/versions/node/v24.0.0/bin/node", platform: "darwin" as const, home: "/Users/maus" };
     expect(runServiceCommand({ ...checkout, exists: (path) => path.startsWith(app), hasSentinel: () => true }, io)).toBe(0);
-    const plist = readFileSync(join(sentinelOut, "com.openmausbot.sentinel.plist"), "utf8");
-    expect(plist).toContain(`<string>${app}/MacOS/OpenMausBot</string>`);
+    const plist = readFileSync(join(sentinelOut, "com.nibble.sentinel.plist"), "utf8");
+    expect(plist).toContain(`<string>${app}/MacOS/Nibble</string>`);
     expect(plist).toContain(`<string>${app}/Resources/server/openmausbot.js</string>`);
     expect(plist).toContain("<key>ELECTRON_RUN_AS_NODE</key>");
     expect(plist).not.toContain("openmausbot.ts");
@@ -123,10 +123,10 @@ describe("openmausbot service", () => {
     // from, with a warning that it can move
     out.length = 0;
     expect(runServiceCommand({ ...checkout, exists: (path) => path.startsWith(app), hasSentinel: () => false }, io)).toBe(0);
-    expect(readFileSync(join(sentinelOut, "com.openmausbot.sentinel.plist"), "utf8")).not.toContain("ELECTRON_RUN_AS_NODE");
+    expect(readFileSync(join(sentinelOut, "com.nibble.sentinel.plist"), "utf8")).not.toContain("ELECTRON_RUN_AS_NODE");
     out.length = 0;
     expect(runServiceCommand({ ...checkout, exists: () => false }, io)).toBe(0);
-    expect(readFileSync(join(sentinelOut, "com.openmausbot.sentinel.plist"), "utf8")).toContain("<string>--experimental-strip-types</string>");
+    expect(readFileSync(join(sentinelOut, "com.nibble.sentinel.plist"), "utf8")).toContain("<string>--experimental-strip-types</string>");
     expect(out.join("\n")).toContain("if either moves (a new checkout, a Node upgrade), run this again");
   });
 });

@@ -8,15 +8,15 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:mobile/core/e2e/descriptor.dart';
-import 'package:mobile/core/e2e/relay_client.dart';
-import 'package:mobile/core/network/sse_client.dart';
-import 'package:mobile/core/storage/pairing_storage.dart';
-import 'package:mobile/core/theme/grok_theme.dart';
-import 'package:mobile/features/approvals/approval_card.dart';
-import 'package:mobile/features/approvals/approval_model.dart';
-import 'package:mobile/features/pairing/pairing_model.dart';
-import 'package:mobile/main.dart';
+import 'package:nibble/core/e2e/descriptor.dart';
+import 'package:nibble/core/e2e/relay_client.dart';
+import 'package:nibble/core/network/sse_client.dart';
+import 'package:nibble/core/storage/pairing_storage.dart';
+import 'package:nibble/core/theme/grok_theme.dart';
+import 'package:nibble/features/approvals/approval_card.dart';
+import 'package:nibble/features/approvals/approval_model.dart';
+import 'package:nibble/features/pairing/pairing_model.dart';
+import 'package:nibble/main.dart';
 
 class _RealHttpOverrides extends HttpOverrides {}
 
@@ -71,7 +71,7 @@ void main() {
         );
       }
       if (request.url.path == '/api/health') {
-        return http.Response('{"app":"openmausbot"}', 200);
+        return http.Response('{"app":"nibble"}', 200);
       }
       if (request.url.path == '/api/events') {
         return http.Response(
@@ -121,7 +121,7 @@ void main() {
         return http.Response('Connection refused', 503);
       }
       if (request.url.host == 'c-hosted.openmausbot.com' && request.url.path == '/api/health') {
-        return http.Response('{"app":"openmausbot"}', 200);
+        return http.Response('{"app":"nibble"}', 200);
       }
       if (request.url.host == 'c-hosted.openmausbot.com' && request.url.path == '/api/events') {
         return http.Response(
@@ -229,7 +229,7 @@ void main() {
 
       final health = await http.get(Uri.parse('$baseUrl/api/health'));
       expect(health.statusCode, 200);
-      expect(jsonDecode(health.body)['app'], 'openmausbot');
+      expect(jsonDecode(health.body)['app'], 'nibble');
 
       final denied = await http.get(Uri.parse('$baseUrl/healthz'));
       expect(denied.statusCode, 404);
@@ -297,7 +297,7 @@ void main() {
       'r': ['relay.example.com'],
     });
 
-    final qrUri = 'openmausbot://pair?token=omb_pair_secret_val&name=SecureStudio&e2e=${desc.toB64u()}';
+    final qrUri = 'nibble://pair?token=omb_pair_secret_val&name=SecureStudio&e2e=${desc.toB64u()}';
     final payload = PairingPayload.fromJsonString(qrUri);
     expect(payload.e2e, isNotNull);
 
@@ -320,7 +320,7 @@ void main() {
         );
       }
       if (request.url.path == '/api/health') {
-        return http.Response('{"app":"openmausbot"}', 200);
+        return http.Response('{"app":"nibble"}', 200);
       }
       if (request.url.path == '/api/events') {
         relayStreamCalled = true;
@@ -406,7 +406,7 @@ void main() {
 
     final mockHttp = MockClient((request) async {
       if (request.url.path == '/api/health') {
-        return http.Response('{"app":"openmausbot"}', 200);
+        return http.Response('{"app":"nibble"}', 200);
       }
       if (request.url.path == '/api/bots') {
         return http.Response(jsonEncode([{'id': 'bot-1', 'name': 'Assistant'}]), 200);
@@ -414,7 +414,7 @@ void main() {
       if (request.url.path == '/api/companion/endpoints') {
         return http.Response(
           jsonEncode({
-            'serverName': 'OpenMausBot Desktop',
+            'serverName': 'Nibble Desktop',
             'endpoints': [{'url': 'http://127.0.0.1:8810', 'kind': 'lan', 'priority': 200}],
             'e2e': desc.toJson(),
           }),
@@ -432,7 +432,7 @@ void main() {
     });
 
     await tester.pumpWidget(
-      MausBotApp(
+      NibbleApp(
         storage: storage,
         httpClient: mockHttp,
       ),

@@ -31,7 +31,7 @@ sidecar on `:8810`, `electron/companion-origin-gateway.mjs` opens the managed or
 `cloudflare/control-plane` maps one opaque hostname to that installation. Close the app
 and all four stop, taking routines (`server/routines.ts`) and the webhook receiver
 (`server/webhook-ingress.ts`, `:8800`) with them. The README says this plainly in its
-Status section, and it is the single biggest gap between OpenMausBot and an "AI employee".
+Status section, and it is the single biggest gap between Nibble and an "AI employee".
 
 The good news, verified: of the five always-on modules, four already take their
 dependencies as injected parameters — `readSecureCredentials` in
@@ -53,7 +53,7 @@ imports `electron`.
 - Modify `server/index.ts`: `GET /api/machine` reporting this installation's identity and capabilities.
 - Modify `companion/src/routes.ts`: allowlist `/api/machine`.
 - Modify `src/components/Sidebar.tsx` or settings: the machine roster.
-- Create `docs/headless.md`, `build/openmausbot.service`, `build/com.openmausbot.serve.plist`.
+- Create `docs/headless.md`, `build/openmausbot.service`, `build/com.nibble.serve.plist`.
 - Modify `package.json`: a `serve` script and a `bin` entry.
 
 ---
@@ -185,7 +185,7 @@ imports `electron`.
 ### Task 7: Ship it as a service
 
 **Files:**
-- Create: `docs/headless.md`, `build/openmausbot.service`, `build/com.openmausbot.serve.plist`
+- Create: `docs/headless.md`, `build/openmausbot.service`, `build/com.nibble.serve.plist`
 - Modify: `README.md` (the Status section's honest note about always-on)
 
 - [ ] Write the systemd unit: `Type=simple`, `Restart=on-failure`, `RestartSec=5`, a dedicated non-root user, `StateDirectory=openmausbot`, and `ProtectSystem=strict` with `~/.openmausbot` as the only writable path.

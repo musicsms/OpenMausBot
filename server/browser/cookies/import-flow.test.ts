@@ -51,7 +51,7 @@ describe("a sign-in import the person starts in the app", () => {
     expect(backend.used("bot:a")).toBe(false);
     main.post({ op: "cookie-import", req: 2, botId: "a", threadId: null, site: "https://github.com/login", source: "chrome", profile: "Default" });
     await sleep(50);
-    expect(main.answers.at(-1)).toEqual({ type: "openmausbot:browser-pane", op: "cookie-import-result", req: 2, result: { ok: true, site: "github.com", imported: 1, sessionOnly: 0, skipped: {} } });
+    expect(main.answers.at(-1)).toEqual({ type: "nibble:browser-pane", op: "cookie-import-result", req: 2, result: { ok: true, site: "github.com", imported: 1, sessionOnly: 0, skipped: {} } });
     expect(main.cookiesSet).toHaveLength(1);
     expect(main.cookiesSet[0]!.partition).toMatch(PANE_PARTITION);
     expect(main.cookiesSet[0]!.cookies).toEqual([{ url: "https://github.com/", name: "user_session", value: "fixture-session-value", domain: ".github.com", path: "/", secure: true, httpOnly: true, sameSite: "lax", expirationDate: LATER }]);

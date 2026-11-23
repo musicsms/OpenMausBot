@@ -103,10 +103,10 @@ describe("serverFetch", () => {
     const { link, sent } = fakeLink(() => Response.json({ environmentId: "env-1" }));
     setRelayLink(link);
 
-    expect(await (await serverFetch("/.well-known/openmausbot/environment")).json()).toEqual({ environmentId: "env-1" });
-    await serverFetch("/.well-known/openmausbot/environmental");
-    expect(sent.map(({ path }) => path)).toEqual(["/.well-known/openmausbot/environment"]);
-    expect(plain.mock.calls.map(([path]) => path)).toEqual(["/.well-known/openmausbot/environmental"]);
+    expect(await (await serverFetch("/.well-known/nibble/environment")).json()).toEqual({ environmentId: "env-1" });
+    await serverFetch("/.well-known/nibble/environmental");
+    expect(sent.map(({ path }) => path)).toEqual(["/.well-known/nibble/environment"]);
+    expect(plain.mock.calls.map(([path]) => path)).toEqual(["/.well-known/nibble/environmental"]);
   });
 
   it("forwards the normalized target: unsafe characters encoded, no fragment", async () => {

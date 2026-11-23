@@ -93,7 +93,7 @@ class _ChatViewState extends State<ChatView> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('OpenMausBot', style: TextStyle(color: Colors.white, fontSize: 16)),
+                const Text('Nibble', style: TextStyle(color: Colors.white, fontSize: 16)),
                 Text(
                   widget.connectionLabel,
                   style: const TextStyle(color: GrokTheme.approvalGreen, fontSize: 11),

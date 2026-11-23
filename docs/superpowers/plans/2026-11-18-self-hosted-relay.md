@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement self-hosted relay connectivity for the OpenMausBot Flutter companion, allowing secure end-to-end encrypted remote access via WebSocket, Noise NKpsk0, yamux, and server-signed relay tokens.
+**Goal:** Implement self-hosted relay connectivity for the Nibble Flutter companion, allowing secure end-to-end encrypted remote access via WebSocket, Noise NKpsk0, yamux, and server-signed relay tokens.
 
 **Architecture:** The server signs its own Ed25519 relay tokens, eliminating control plane dependencies. The relay runs behind Cloudflare Tunnel on loopback port 8080 and respects client IP headers (`Cf-Connecting-IP` / `X-Forwarded-For`) from loopback. The Flutter companion implements the phone side of wire spec v1 in Dart (`mobile/lib/core/e2e/`), pinning the server key `k` from the QR code and multiplexing HTTP/1.1 requests over yamux streams.
 
@@ -725,7 +725,7 @@ git commit -m "feat(mobile): add descriptor parsing and phone relay WebSocket cl
 - [ ] **Step 1: Write the failing test**
 
 In `mobile/test/pairing_test.dart`, add tests verifying:
-1. `PairingPayload` extracts `e2e` query parameter from `openmausbot://pair?...&e2e=...`.
+1. `PairingPayload` extracts `e2e` query parameter from `nibble://pair?...&e2e=...`.
 2. `PairingStorage` stores and retrieves pinned transport key `k`, `h`, and `r`.
 3. `SseNetworkClient` refuses plain HTTP requests when an E2E pairing exists (fail-closed invariant).
 
@@ -768,7 +768,7 @@ git commit -m "feat(mobile): integrate E2E relay transport and secure storage in
 - Modify: `package.json` (add interop test script)
 
 **Interfaces:**
-- Consumes: Node relay (`relay/src/main.ts`), OpenMausBot server (`server/phone-relay.ts`), Dart E2E client test
+- Consumes: Node relay (`relay/src/main.ts`), Nibble server (`server/phone-relay.ts`), Dart E2E client test
 - Produces: Passing automated interop test executing pairing, chat, SSE stream, tool approval, and session revocation.
 
 - [ ] **Step 1: Write the failing test**
@@ -783,7 +783,7 @@ import { spawn } from "node:child_process";
 describe("self-hosted relay automated interop", () => {
   it("completes full pairing, chat, SSE stream, and revocation cycle through real relay", async () => {
     // 1. Launch Node relay on loopback with generated Ed25519 public key
-    // 2. Launch OpenMausBot server with --relay-self-hosted in isolated temp directory
+    // 2. Launch Nibble server with --relay-self-hosted in isolated temp directory
     // 3. Obtain pairing QR with e2e descriptor
     // 4. Run Dart client CLI / test runner to pair through relay
     // 5. Send message, receive streamed response

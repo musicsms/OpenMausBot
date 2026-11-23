@@ -74,7 +74,7 @@ function answer(req: IncomingMessage, res: ServerResponse, raw: string) {
       return res.end(text);
     }
     if (report && body.listFolder) {
-      return send(200, { name: "report", entries: Object.entries(report).map(([name, text]) => ({ name, bytes: Buffer.byteLength(text) })), truncated: false }, { "x-openmausbot-folder": "1" });
+      return send(200, { name: "report", entries: Object.entries(report).map(([name, text]) => ({ name, bytes: Buffer.byteLength(text) })), truncated: false }, { "x-nibble-folder": "1" });
     }
     if (body.path === "old.md") {
       res.writeHead(200, { "content-type": "text/markdown", "content-length": "3" });
@@ -99,7 +99,7 @@ function answer(req: IncomingMessage, res: ServerResponse, raw: string) {
       return res.end(body.entry);
     }
     if (body.path === "shots/" && body.listFolder) {
-      return send(200, { name: "shots", entries: [{ name: "a.png", bytes: 5 }, { name: "b.png", bytes: 5 }], truncated: false }, { "x-openmausbot-folder": "1" });
+      return send(200, { name: "shots", entries: [{ name: "a.png", bytes: 5 }, { name: "b.png", bytes: 5 }], truncated: false }, { "x-nibble-folder": "1" });
     }
     return send(403, { error: "that bot message does not link to this file" });
   }

@@ -72,7 +72,7 @@ describe("self-hosted relay automated interop", () => {
       const env: NodeJS.ProcessEnv = {
         ...verificationServerEnvironment(process.env, serverDataDir, serverPort),
         OMB_PHONE_RELAY_SELF_HOSTED: "1",
-        OMB_PHONE_RELAY_NODES: "relay1.openmausbot.com",
+        OMB_PHONE_RELAY_NODES: "relay1.example.com",
         OMB_PHONE_RELAY_URL: `ws://127.0.0.1:${relayPort}`,
         FAKE_CLAUDE_PROBE: "1",
       };
@@ -91,7 +91,7 @@ describe("self-hosted relay automated interop", () => {
           (r) => r.json(),
           () => null,
         )) as { app?: string } | null;
-        return res?.app === "openmausbot";
+        return res?.app === "nibble";
       }, 30_000);
 
       await waitFor(async () => {

@@ -5,10 +5,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:mobile/core/storage/pairing_storage.dart';
-import 'package:mobile/features/chat/chat_view.dart';
-import 'package:mobile/features/pairing/pairing_view.dart';
-import 'package:mobile/main.dart';
+import 'package:nibble/core/storage/pairing_storage.dart';
+import 'package:nibble/features/chat/chat_view.dart';
+import 'package:nibble/features/pairing/pairing_view.dart';
+import 'package:nibble/main.dart';
 
 MockClient _pairMock({
   required String token,
@@ -35,7 +35,7 @@ MockClient _pairMock({
       );
     }
     if (request.url.path == '/api/health') {
-      return http.Response('{"app":"openmausbot"}', 200);
+      return http.Response('{"app":"nibble"}', 200);
     }
     if (request.url.path == '/api/bots') {
       return http.Response(
@@ -64,7 +64,7 @@ void main() {
   testWidgets('displays PairingView when unauthenticated', (WidgetTester tester) async {
     final storage = PairingStorage();
     await tester.pumpWidget(
-      MausBotApp(
+      NibbleApp(
         storage: storage,
         scannerWidget: const SizedBox(),
       ),
@@ -85,7 +85,7 @@ void main() {
     final storage = PairingStorage();
 
     await tester.pumpWidget(
-      MausBotApp(
+      NibbleApp(
         storage: storage,
         scannerWidget: const SizedBox(),
         httpClient: _pairMock(token: 'omb_existing-token-xyz', lanUrl: 'http://127.0.0.1:8810'),
@@ -95,7 +95,7 @@ void main() {
 
     expect(find.byType(ChatView), findsOneWidget);
     expect(find.byType(PairingView), findsNothing);
-    expect(find.text('OpenMausBot'), findsOneWidget);
+    expect(find.text('Nibble'), findsOneWidget);
   });
 
   testWidgets('manual code redeem stores omb_ token and opens chat', (WidgetTester tester) async {
@@ -107,7 +107,7 @@ void main() {
     final storage = PairingStorage();
     const token = 'omb_manual_token_abcdefghijklmnopqrstuvw';
     await tester.pumpWidget(
-      MausBotApp(
+      NibbleApp(
         storage: storage,
         scannerWidget: const SizedBox(),
         httpClient: _pairMock(token: token, lanUrl: 'http://192.168.1.50:8810'),
@@ -136,7 +136,7 @@ void main() {
     const token = 'omb_qr_token_abcdefghijklmnopqrstuvwxyz12';
 
     await tester.pumpWidget(
-      MausBotApp(
+      NibbleApp(
         storage: storage,
         scannerWidget: const SizedBox(),
         httpClient: _pairMock(

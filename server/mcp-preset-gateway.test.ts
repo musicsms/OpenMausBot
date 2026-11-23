@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildGatewayMcpConfig, registerLocalGatewayPreset } from "./mcp-preset-gateway.ts";
 import { parseStoredMcpServer } from "./mcp-registry.ts";
 
-describe("OpenMausBot Gateway Preset", () => {
+describe("Nibble Gateway Preset", () => {
   it("builds a valid RemoteMcpSpec for the local unified gateway", () => {
     const spec = buildGatewayMcpConfig("http://127.0.0.1:8318/sse", "unified-gateway", "gateway-secret");
     expect(spec.name).toBe("unified-gateway");

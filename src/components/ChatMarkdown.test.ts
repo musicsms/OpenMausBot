@@ -567,23 +567,23 @@ describe("#Title thread links in markdown", () => {
   });
 
   it("renders a sent canonical link as a chip that opens the thread", () => {
-    const markup = render("done in [QA PR 245](openmausbot://thread/qa-245?bot=scout) today");
+    const markup = render("done in [QA PR 245](nibble://thread/qa-245?bot=scout) today");
     expect(markup).toContain('<button type="button" data-thread-link="qa-245"');
     expect(markup).toContain(">QA PR 245</button>");
-    expect(markup).not.toContain('href="openmausbot://');
+    expect(markup).not.toContain('href="nibble://');
   });
 
   it("keeps a dead thread link as plain text, never an external anchor", () => {
-    const markup = render("see [Gone](openmausbot://thread/dead?bot=scout)");
+    const markup = render("see [Gone](nibble://thread/dead?bot=scout)");
     expect(markup).toContain(">Gone<");
     expect(markup).not.toContain("data-thread-link");
-    expect(markup).not.toContain('href="openmausbot://');
+    expect(markup).not.toContain('href="nibble://');
     expect(markup).not.toContain('target="_blank"');
   });
 });
 
 describe("a Use my Mac link in an older bot message", () => {
-  const text = "To let me use your apps, press [Use my Mac](openmausbot://use-my-computer).";
+  const text = "To let me use your apps, press [Use my Mac](nibble://use-my-computer).";
 
   it("is plain text everywhere, even in this app with an older Cloud's bridge: this computer is lent by itself", () => {
     const offer = vi.fn(async () => {});
@@ -592,12 +592,12 @@ describe("a Use my Mac link in an older bot message", () => {
       const markup = renderToStaticMarkup(createElement(ChatMarkdown, { text }));
       expect(markup).toContain(">Use my Mac<");
       expect(markup).not.toContain("<button");
-      expect(markup).not.toContain('href="openmausbot://');
+      expect(markup).not.toContain('href="nibble://');
       expect(offer).not.toHaveBeenCalled();
     } finally {
       delete window.ogb;
     }
-    expect(chatUrlTransform("openmausbot://use-my-computer")).toBe("openmausbot://use-my-computer");
+    expect(chatUrlTransform("nibble://use-my-computer")).toBe("nibble://use-my-computer");
   });
 });
 
@@ -1336,13 +1336,13 @@ describe("bidi: message content carries its own direction", () => {
   it("goes with the script that has more words, so an Arabic answer opening on a Latin name stays right-to-left", () => {
     expect(textDirection("Chrome 158 هو الإصدار الأحدث من المتصفح")).toBe("rtl");
     expect(textDirection("Node.js بيئة تشغيل لجافاسكريبت على الخادم")).toBe("rtl");
-    expect(textDirection("OpenMausBot v0.1.169 صدر في 2026-11-18 مع إصلاحات كثيرة")).toBe("rtl");
+    expect(textDirection("Nibble v0.1.169 صدر في 2026-11-18 مع إصلاحات كثيرة")).toBe("rtl");
     expect(textDirection("The Arabic word مرحبا means hello")).toBe("ltr");
     expect(textDirection("שלום is how you say hello in Hebrew, among other things")).toBe("ltr");
   });
 
   it("does not count a bare address, which is Latin in any language", () => {
-    expect(textDirection("راجع https://github.com/milind-soni/OpenMausBot/issues/6541 للتفاصيل")).toBe("rtl");
+    expect(textDirection("راجع https://github.com/milind-soni/Nibble/issues/6541 للتفاصيل")).toBe("rtl");
     expect(textDirection("https://openmausbot.com/download هو رابط التحميل الرسمي")).toBe("rtl");
     expect(textDirection("انظر www.example.com/a/very/long/path/to/the/release/notes هنا")).toBe("rtl");
     expect(textDirection("https://example.com/page")).toBe("ltr");

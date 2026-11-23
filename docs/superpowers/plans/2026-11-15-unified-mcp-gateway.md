@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a self-hosted, local Unified MCP Gateway running on `localhost:8318` that manages multi-account OAuth2/PAT credentials (modeled after `cliproxyapi`/`9router`), and exposes tools directly to OpenMausBot via the Model Context Protocol (MCP) without external intermediaries.
+**Goal:** Build a self-hosted, local Unified MCP Gateway running on `localhost:8318` that manages multi-account OAuth2/PAT credentials (modeled after `cliproxyapi`/`9router`), and exposes tools directly to Nibble via the Model Context Protocol (MCP) without external intermediaries.
 
 **Architecture:** A standalone lightweight TypeScript service in `mcp-gateway/` with:
 - An `auth-dir` (`~/.mcp-gateway/auth/`) storing isolated JSON credentials per `<provider>_<alias>.json`.
@@ -13,14 +13,14 @@
 
 **Tech Stack:** Node.js (>=24), TypeScript, `@modelcontextprotocol/sdk`, `express` (or native `node:http`), `zod`, `vitest`.
 
-**Spec:** [docs/superpowers/specs/2026-11-15-unified-mcp-gateway-design.md](file:///home/ubuntu/OpenMausBot/docs/superpowers/specs/2026-11-15-unified-mcp-gateway-design.md)
+**Spec:** [docs/superpowers/specs/2026-11-15-unified-mcp-gateway-design.md](file:///home/ubuntu/Nibble/docs/superpowers/specs/2026-11-15-unified-mcp-gateway-design.md)
 
 ## Global Constraints
 
 - Bound exclusively to loopback `127.0.0.1` by default; no public exposure.
 - File permissions on credential files must be `0600`.
 - All tool results and calls must conform strictly to the Model Context Protocol specification.
-- Follow `OpenMausBot/AGENTS.md` coding rules: write comments only for what the code cannot say; no narrative comments; never suppress correctness lint rules.
+- Follow `Nibble/AGENTS.md` coding rules: write comments only for what the code cannot say; no narrative comments; never suppress correctness lint rules.
 - Isolated verification only (per `docs/verification/README.md`); never mutate live user credentials in tests.
 
 ---
@@ -689,7 +689,7 @@ export function renderDashboardHtml(accounts: AccountCredential[]): string {
 <body>
   <div class="card">
     <h1>Unified MCP Gateway</h1>
-    <p>Direct Multi-Account Integrations for OpenMausBot (Port 8318)</p>
+    <p>Direct Multi-Account Integrations for Nibble (Port 8318)</p>
     <h2>Connected Accounts</h2>
     <table>
       <thead>
@@ -887,7 +887,7 @@ export class GitHubAdapter implements ServiceAdapter {
           const res = await fetch("https://api.github.com/user/repos?sort=updated&per_page=10", {
             headers: {
               Authorization: `Bearer ${token}`,
-              "User-Agent": "OpenMausBot-Unified-Gateway",
+              "User-Agent": "Nibble-Unified-Gateway",
               Accept: "application/vnd.github+json",
             },
           });
@@ -1387,7 +1387,7 @@ git commit -m "feat(mcp-gateway): add Slack, Notion, and declarative Custom REST
 
 ---
 
-### Task 9: OpenMausBot Remote MCP Preset & Docker Compose Setup
+### Task 9: Nibble Remote MCP Preset & Docker Compose Setup
 
 **Files:**
 - Create: `mcp-gateway/Dockerfile`
@@ -1397,16 +1397,16 @@ git commit -m "feat(mcp-gateway): add Slack, Notion, and declarative Custom REST
 
 **Interfaces:**
 - Produces: `mcp-gateway/Dockerfile` and `docker-compose.yml` for self-hosted execution.
-- Produces: Helper `registerLocalGatewayPreset(config)` in OpenMausBot to add the gateway to `server/mcp-registry.ts`.
+- Produces: Helper `registerLocalGatewayPreset(config)` in Nibble to add the gateway to `server/mcp-registry.ts`.
 
-- [ ] **Step 1: Write test for OpenMausBot Gateway Preset registration**
+- [ ] **Step 1: Write test for Nibble Gateway Preset registration**
 
 ```typescript
 // server/mcp-preset-gateway.test.ts
 import { describe, it, expect } from "vitest";
 import { buildGatewayMcpConfig } from "./mcp-preset-gateway.ts";
 
-describe("OpenMausBot Gateway Preset", () => {
+describe("Nibble Gateway Preset", () => {
   it("builds a valid RemoteMcpSpec for the local unified gateway", () => {
     const spec = buildGatewayMcpConfig("http://127.0.0.1:8318/sse");
     expect(spec.name).toBe("unified-gateway");
@@ -1480,7 +1480,7 @@ Expected: PASS
 
 ```bash
 git add mcp-gateway/Dockerfile mcp-gateway/docker-compose.yml server/mcp-preset-gateway.ts server/mcp-preset-gateway.test.ts
-git commit -m "feat(mcp-gateway): add Docker packaging and OpenMausBot preset registration"
+git commit -m "feat(mcp-gateway): add Docker packaging and Nibble preset registration"
 ```
 
 ---
@@ -1492,7 +1492,7 @@ git commit -m "feat(mcp-gateway): add Docker packaging and OpenMausBot preset re
 - Test: `mcp-gateway/test/e2e-gateway-omb.test.ts`
 
 **Interfaces:**
-- Verifies: Start gateway with temporary `auth-dir` -> OpenMausBot MCP client connects via SSE -> Lists dynamic tools -> Dispatches tool call -> Receives successful response.
+- Verifies: Start gateway with temporary `auth-dir` -> Nibble MCP client connects via SSE -> Lists dynamic tools -> Dispatches tool call -> Receives successful response.
 
 - [ ] **Step 1: Write the end-to-end integration test**
 
@@ -1510,7 +1510,7 @@ import { McpRouter } from "../src/mcp/router.ts";
 import { GoogleAdapter } from "../src/adapters/google-adapter.ts";
 import { createGatewayServer } from "../src/mcp/sse-server.ts";
 
-describe("E2E Gateway -> OpenMausBot Client", () => {
+describe("E2E Gateway -> Nibble Client", () => {
   let testDir: string;
   let server: Server;
   let port: number;

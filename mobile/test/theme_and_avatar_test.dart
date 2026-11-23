@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/theme/grok_theme.dart';
-import 'package:mobile/features/bots/avatar_pulse.dart';
+import 'package:nibble/core/theme/grok_theme.dart';
+import 'package:nibble/features/bots/avatar_pulse.dart';
 
 void main() {
   test('GrokTheme enforces OLED true black background and styling', () {

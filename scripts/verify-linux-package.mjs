@@ -75,8 +75,8 @@ function requireUpdaterTarget(resources, label) {
   const updateFile = path.join(resources, "app-update.yml");
   requireFile(updateFile);
   const update = readFileSync(updateFile, "utf8");
-  if (!/^owner: milind-soni$/m.test(update) || !/^repo: OpenMausBot$/m.test(update)) {
-    fail(`${label} app-update.yml does not point at milind-soni/OpenMausBot`);
+  if (!/^owner: milind-soni$/m.test(update) || !/^repo: Nibble$/m.test(update)) {
+    fail(`${label} app-update.yml does not point at milind-soni/Nibble`);
   }
 }
 
@@ -167,7 +167,7 @@ function verifyCompliance(licenses, label) {
   const registryIds = new Set();
   for (const component of registry) {
     const packageId = component.properties?.find(
-      (property) => property.name === "openmausbot:cargo:package-id",
+      (property) => property.name === "nibble:cargo:package-id",
     )?.value;
     if (typeof packageId !== "string" || !packageId.startsWith("registry+")) {
       fail(`${label} SBOM registry component has no exact Cargo package ID`);
@@ -437,7 +437,7 @@ for (const expected of [
 
 // The DEB and RPM install the same tree under /opt; check what each extracted.
 function verifySystemPackage(extracted, label, packageType) {
-  const appRoot = path.join(extracted, "opt", "OpenMausBot");
+  const appRoot = path.join(extracted, "opt", "Nibble");
   requireDirectoryMode(appRoot, 0o755);
   const packageResources = path.join(appRoot, "resources");
   // Routes the in-app updater to the package-manager hand-off.
@@ -457,7 +457,7 @@ function verifySystemPackage(extracted, label, packageType) {
     "usr",
     "share",
     "applications",
-    "com.openmausbot.app.desktop",
+    "com.nibble.app.desktop",
   );
   const scalableIcon = path.join(
     extracted,
@@ -473,10 +473,10 @@ function verifySystemPackage(extracted, label, packageType) {
   requireFile(scalableIcon);
   const desktop = readFileSync(desktopFile, "utf8");
   for (const expected of [
-    "Name=OpenMausBot",
-    "Exec=/opt/OpenMausBot/openmausbot %U",
+    "Name=Nibble",
+    "Exec=/opt/Nibble/openmausbot %U",
     "Icon=openmausbot",
-    "StartupWMClass=com.openmausbot.app",
+    "StartupWMClass=com.nibble.app",
     "Categories=Utility;",
   ]) {
     if (!desktop.includes(expected)) fail(`${label} desktop entry is missing ${JSON.stringify(expected)}`);

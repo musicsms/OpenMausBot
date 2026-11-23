@@ -135,7 +135,7 @@ describe("the runtime router", () => {
     { name: "agent_browser_tab_new", arguments: { url: "https://www.reddit.com/" } },
   ];
 
-  it("tells a bot on MausBot Cloud why its browser doesn't open Reddit, on either engine, without reaching it", async () => {
+  it("tells a bot on Nibble Cloud why its browser doesn't open Reddit, on either engine, without reaching it", async () => {
     const { old, chrome, runtime } = onHost("cloud");
     for (const spec of [AGENT_BROWSER, CHROME]) {
       for (const call of OPENS_REDDIT) {
@@ -368,7 +368,7 @@ describe("deleting a bot's browser on the desktop app, pane off", () => {
       expect(await value.erase({ kind: "profile", id: "p", partitionId: "p1" })).toBe(true);
       expect(erase).not.toHaveBeenCalled();
       expect(existsSync(join(browserRoot(dataDir), "workspace-id"))).toBe(false);
-      expect(posted).toEqual([{ type: "openmausbot:browser-pane", op: "hello" }]);
+      expect(posted).toEqual([{ type: "nibble:browser-pane", op: "hello" }]);
     } finally {
       await value.close();
       await removeTempDir(dataDir);

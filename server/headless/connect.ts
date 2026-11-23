@@ -18,7 +18,7 @@ const isLoopback = (origin: string) => /^https?:\/\/(?:127\.0\.0\.1|localhost|\[
 async function call(origin: string, path: string, init: RequestInit = {}): Promise<{ status: number; body: Rec }> {
   const response = await fetch(`${origin}${path}`, {
     ...init, redirect: "error", signal: AbortSignal.timeout(15_000),
-    headers: { "content-type": "application/json", "x-openmausbot-cli": "1", ...(init.headers as Record<string, string> | undefined) },
+    headers: { "content-type": "application/json", "x-nibble-cli": "1", ...(init.headers as Record<string, string> | undefined) },
   });
   return { status: response.status, body: await response.json().catch(() => ({})) as Rec };
 }
@@ -42,10 +42,10 @@ const PROBLEM: Record<string, string> = {
   empty: "give the server's address or its pairing link",
   codeOnly: "that is a pairing code: give the server's address too, like openmausbot connect http://192.168.1.20:8799 --code CODE",
   emailCode: "that is a sign-in code from an email; pairing needs a 12-character code like 7KQ2-M9XD-H4TP",
-  oldCode: "that is a code from an older MausBot; pairing needs a 12-character code like 7KQ2-M9XD-H4TP",
+  oldCode: "that is a code from an older Nibble; pairing needs a 12-character code like 7KQ2-M9XD-H4TP",
   scriptKey: "that is a script key; pass it with --token-file instead of pairing",
   notACode: "that is not a pairing code; pairing needs a 12-character code like 7KQ2-M9XD-H4TP",
-  phoneLink: "that link is for the MausBot phone app; give the server's address or the link the server printed",
+  phoneLink: "that link is for the Nibble phone app; give the server's address or the link the server printed",
   notAnAddress: "that is not a server address; give the link the server printed, or its address like http://192.168.1.20:8799",
 };
 
@@ -69,7 +69,7 @@ export async function connectVerb(ctx: VerbContext): Promise<VerbOutcome> {
   let origin = candidates[0]!;
   let described: { status: number; body: Rec } | null = null;
   for (const candidate of candidates) {
-    described = await call(candidate, "/.well-known/openmausbot/environment").catch(() => null);
+    described = await call(candidate, "/.well-known/nibble/environment").catch(() => null);
     origin = candidate;
     if (described?.status === 200 && typeof described.body.environmentId === "string") break;
   }
@@ -77,7 +77,7 @@ export async function connectVerb(ctx: VerbContext): Promise<VerbOutcome> {
   let code = secret;
   if (!code && !isLoopback(origin)) throw usageError("a workspace elsewhere needs a pairing code", pairHint);
   if (described?.status !== 200 || typeof described.body.environmentId !== "string") {
-    throw new HeadlessError(`no MausBot server answers at ${origin}`, EXIT.unreachable, "check the address, and that the server is running with a way in (see openmausbot serve --help on the server)");
+    throw new HeadlessError(`no Nibble server answers at ${origin}`, EXIT.unreachable, "check the address, and that the server is running with a way in (see openmausbot serve --help on the server)");
   }
   const label = flag(ctx.flags, "label")?.trim() || "openmausbot CLI";
   if (!code) {
@@ -86,7 +86,7 @@ export async function connectVerb(ctx: VerbContext): Promise<VerbOutcome> {
       const desktop = typeof minted.body.error === "string" && minted.body.error.includes("must come from the desktop app");
       throw new HeadlessError(`this server will not mint a pairing code for a command on this computer${minted.body.error ? ` (${minted.body.error})` : ""}`,
         EXIT.notAllowed, desktop
-          ? `the MausBot app runs this server: run ${cliCommand("login")} instead and press Allow in the app, or make a code in Settings → Phone & devices and pass --code CODE`
+          ? `the Nibble app runs this server: run ${cliCommand("login")} instead and press Allow in the app, or make a code in Settings → Phone & devices and pass --code CODE`
           : `${cliCommand("pair")} in a terminal on this computer, then pass --code CODE`);
     }
     code = minted.body.code as string;

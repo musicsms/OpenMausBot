@@ -40,7 +40,7 @@ const appPage = PAGES_WITHOUT_THE_APP.has(location.pathname) ? null : loadApp();
 if (appPage) startDesktopLaunchMarks();
 
 /** A team's name as its server describes itself to anyone (the descriptor's label), null when it can't say. */
-const teamName = () => serverFetch("/.well-known/openmausbot/environment").then((res) => res.json() as Promise<{ label?: unknown; capabilities?: { cloudTeam?: unknown } }>)
+const teamName = () => serverFetch("/.well-known/nibble/environment").then((res) => res.json() as Promise<{ label?: unknown; capabilities?: { cloudTeam?: unknown } }>)
   .then((descriptor) => (descriptor.capabilities?.cloudTeam === true && typeof descriptor.label === "string" ? descriptor.label : null), () => null);
 
 async function chooseRoot(): Promise<React.ReactNode> {

@@ -40,7 +40,7 @@ export class GitHubAdapter implements ServiceAdapter {
           const res = await fetchWith429Retry(url, {
             headers: {
               Authorization: `Bearer ${token}`,
-              "User-Agent": "OpenMausBot-Unified-Gateway",
+              "User-Agent": "Nibble-Unified-Gateway",
               Accept: "application/vnd.github+json",
             },
           });
@@ -91,7 +91,7 @@ export class GitHubAdapter implements ServiceAdapter {
           const res = await fetchWith429Retry(url, {
             headers: {
               Authorization: `Bearer ${token}`,
-              "User-Agent": "OpenMausBot-Unified-Gateway",
+              "User-Agent": "Nibble-Unified-Gateway",
               Accept: "application/vnd.github+json",
             },
           });
@@ -153,7 +153,7 @@ export class GitHubAdapter implements ServiceAdapter {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
-              "User-Agent": "OpenMausBot-Unified-Gateway",
+              "User-Agent": "Nibble-Unified-Gateway",
               Accept: "application/vnd.github+json",
               "Content-Type": "application/json",
             },

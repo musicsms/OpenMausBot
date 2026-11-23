@@ -45,7 +45,7 @@ function stubWorkspace() {
   const fetchImpl = async (url, init) => {
     const route = new URL(url).pathname;
     if (route === "/api/auth/session") return json({ kind: "session", id: sessionId });
-    if (route === "/.well-known/openmausbot/environment") return json({ environmentId, capabilities: { sharedComputers: true } });
+    if (route === "/.well-known/nibble/environment") return json({ environmentId, capabilities: { sharedComputers: true } });
     const body = init?.body ? JSON.parse(init.body) : {};
     if (route === "/api/shared-computers/connect") { state.connected = body; return json({}); }
     if (route.endsWith("/poll")) {
@@ -528,11 +528,11 @@ process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n'); });`
 test("a protected directory spelled in another case is still refused", async t => {
   const { dir, folder, grant, run } = await fixture(t);
   if (!(await spellings(dir)).case) return t.skip("this filesystem is case-sensitive, so no case variant names the same directory");
-  await mkdir(path.join(dir, "OpenMausBot"));
-  await writeFile(path.join(dir, "OpenMausBot", "credentials.bin"), "credential blob");
-  grant.protectedPaths = [path.join(dir, "OpenMausBot")];
+  await mkdir(path.join(dir, "Nibble"));
+  await writeFile(path.join(dir, "Nibble", "credentials.bin"), "credential blob");
+  grant.protectedPaths = [path.join(dir, "Nibble")];
   folder.write = true;
-  await assert.rejects(run({ action: "read_file", path: "OpenMausBot/credentials.bin" }), /Desktop credentials/);
+  await assert.rejects(run({ action: "read_file", path: "Nibble/credentials.bin" }), /Desktop credentials/);
   await assert.rejects(run({ action: "read_file", path: "openmausbot/credentials.bin" }), /Desktop credentials/);
   await assert.rejects(run({ action: "read_file", path: "OPENMAUSBOT/credentials.bin" }), /Desktop credentials/);
   await assert.rejects(run({ action: "list_files", path: "openmausbot" }), /Desktop credentials/);
@@ -677,11 +677,11 @@ test("with the whole home folder lent, keys, a browser profile and this app's da
     await put("Documents/plan.txt", "an ordinary file");
     const stub = stubWorkspace();
     stub.state.work.push(...secrets.map(relative => ({ action: "read_file", path: relative })),
-      { action: "read_file", path: "Library/Application Support/OpenMausBot/computer-sharing.json" },
+      { action: "read_file", path: "Library/Application Support/Nibble/computer-sharing.json" },
       { action: "read_file", path: "Documents/plan.txt" }, { action: "list_files" });
     // Wired as main wires it: the grants file under the app's own profile, and this app's data folder in protectedPaths.
     sharing = createComputerSharing({
-      file: path.join(home, "Library", "Application Support", "OpenMausBot", "computer-sharing.json"), fetch: stub.fetchImpl, home,
+      file: path.join(home, "Library", "Application Support", "Nibble", "computer-sharing.json"), fetch: stub.fetchImpl, home,
       environments: () => [stub.env], enabled: async () => true, cuaConnection: async () => null, protectedPaths: [path.join(home, ".openmausbot")],
     });
     const info = await sharing.identity(stub.env);

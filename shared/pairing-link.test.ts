@@ -33,7 +33,7 @@ describe("phonePairingLink", () => {
     });
 
     const url = new URL(link!);
-    expect(url.protocol).toBe("openmausbot:");
+    expect(url.protocol).toBe("nibble:");
     expect(url.host).toBe("pair");
     expect(url.searchParams.get("address")).toBe("macbook.tail1234.ts.net:8810");
     expect(url.searchParams.get("token")).toBe(token);
@@ -155,10 +155,10 @@ describe("phonePairingLink", () => {
 
   it("is the server's link too: an https origin, a credential, a name and no code", () => {
     const link = phonePairingLink({ address: "https://mini.example", token, name: "Ada's server" })!;
-    expect(link).toBe(`openmausbot://pair?address=https%3A%2F%2Fmini.example&token=${token}&name=Ada's%20server`);
+    expect(link).toBe(`nibble://pair?address=https%3A%2F%2Fmini.example&token=${token}&name=Ada's%20server`);
     expect(rawField(link, "code")).toBeUndefined();
     expect(phonePairingLink({ address: "http://192.168.1.5:8787", token })).toBe(
-      `openmausbot://pair?address=http%3A%2F%2F192.168.1.5%3A8787&token=${token}`,
+      `nibble://pair?address=http%3A%2F%2F192.168.1.5%3A8787&token=${token}`,
     );
   });
 
@@ -179,7 +179,7 @@ describe("phonePairingLink", () => {
   it("carries the end-to-end descriptor a phone parses, and leaves out one it would refuse", async () => {
     const { parseDescriptor } = await import("../companion/src/e2e/descriptor.ts");
     const k = Buffer.from(createECDH("prime256v1").generateKeys()).toString("base64url");
-    const e2e = { v: 1 as const, k, h: "lz81isB3BuNV6rHgYgG3Wg", r: ["relay1.openmausbot.com", "relay2.openmausbot.com"] };
+    const e2e = { v: 1 as const, k, h: "lz81isB3BuNV6rHgYgG3Wg", r: ["relay1.example.com", "relay2.example.com"] };
     const link = phonePairingLink({ address: "192.168.1.5", port: 8810, token, e2e })!;
     const parsed = parseDescriptor(new URL(link).searchParams.get("e2e"));
     expect(parsed).toMatchObject({ outcome: "ok", descriptor: e2e });

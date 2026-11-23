@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:mobile/core/network/sse_client.dart';
-import 'package:mobile/features/pairing/pairing_model.dart';
+import 'package:nibble/core/network/sse_client.dart';
+import 'package:nibble/features/pairing/pairing_model.dart';
 
 class ClosableMockClient extends MockClient {
   bool isClosed = false;
@@ -21,13 +21,13 @@ void main() {
     test('parses SSE JSON event frames from /api/events', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         if (request.url.path == '/api/events') {
           return http.Response(
             'data: {"kind":"hello","cursor":"a:0"}\n\n'
             'id: a:1\ndata: {"kind":"message","message":{"text":"Hello world"}}\n\n'
-            'id: a:2\ndata: {"kind":"message","message":{"text":"from OpenMausBot"}}\n\n',
+            'id: a:2\ndata: {"kind":"message","message":{"text":"from Nibble"}}\n\n',
             200,
             headers: {'content-type': 'text/event-stream'},
           );
@@ -55,7 +55,7 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         if (request.url.path == '/api/events') {
           capturedPath = request.url.path;
@@ -89,7 +89,7 @@ void main() {
     test('throws Exception when stream endpoint returns non-200 status', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         return http.Response('Unauthorized', 401);
       });
@@ -113,7 +113,7 @@ void main() {
         capturedAuth = request.headers['authorization'];
         capturedPath = request.url.path;
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         return http.Response('Not found', 404);
       });
@@ -132,7 +132,7 @@ void main() {
     test('resolveActiveBaseUrl prefers LAN when health check succeeds', () async {
       final mockClient = MockClient((request) async {
         if (request.url.host == '192.168.1.100' && request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         return http.Response('Not found', 404);
       });
@@ -156,7 +156,7 @@ void main() {
           return http.Response('Error', 500);
         }
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         return http.Response('Not found', 404);
       });
@@ -193,7 +193,7 @@ void main() {
     test('strips trailing slashes from endpoint URLs', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         return http.Response('Not found', 404);
       });
@@ -218,7 +218,7 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         if (request.method == 'POST') {
           capturedAuth = request.headers['authorization'];
@@ -252,7 +252,7 @@ void main() {
 
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         if (request.method == 'POST') {
           capturedPath = request.url.path;
@@ -287,7 +287,7 @@ void main() {
     test('postJson returns false on non-2xx status code', () async {
       final mockClient = MockClient((request) async {
         if (request.url.path == '/api/health') {
-          return http.Response('{"app":"openmausbot"}', 200);
+          return http.Response('{"app":"nibble"}', 200);
         }
         return http.Response('Bad request', 400);
       });

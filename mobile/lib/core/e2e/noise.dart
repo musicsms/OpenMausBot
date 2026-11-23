@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:convert/convert.dart';
 import 'package:crypto/crypto.dart' as crypto;
-import 'package:mobile/core/e2e/credentials.dart';
-import 'package:mobile/core/e2e/crypto.dart';
+import 'package:nibble/core/e2e/credentials.dart';
+import 'package:nibble/core/e2e/crypto.dart';
 
 const String protocolName = 'Noise_NKpsk0_P256_AESGCM_SHA256';
 const int publicKeyBytes = 65;

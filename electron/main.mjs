@@ -181,10 +181,10 @@ function applyUnreadBadge(win = mainWindow) {
 // A launch with --disable-gpu (a desktop entry or a user workaround) renders on the CPU too.
 const linuxSoftwareRendering = process.platform === "linux" && (linuxDisablesGpu() || app.commandLine.hasSwitch("disable-gpu"));
 if (linuxSoftwareRendering) app.disableHardwareAcceleration();
-if (process.platform === "linux") { app.setDesktopName("com.openmausbot.app.desktop"); disableWaylandColorManager(app.commandLine); }
+if (process.platform === "linux") { app.setDesktopName("com.nibble.app.desktop"); disableWaylandColorManager(app.commandLine); }
 
 if (!app.requestSingleInstanceLock()) {
-  console.log("[desktop] OpenMausBot is already running — focusing that window");
+  console.log("[desktop] Nibble is already running — focusing that window");
   process.exit(0);
 }
 
@@ -249,7 +249,7 @@ app.on("open-url", (event, url) => {
 
 app.on("second-instance", (_event, commandLine) => {
   if (takeOrganizationDeepLink(commandLine)) {
-    queueOrganizationEntry("openmausbot://organization");
+    queueOrganizationEntry("nibble://organization");
     return;
   }
   if (cloudEntry.fromArgs(commandLine)) return; if (teamLinks.fromArgs(commandLine)) return;
@@ -797,7 +797,7 @@ function syncPhoneSecretKey(proc) {
 const cloudEncryption = { available: async () => (await safeStorage.isAsyncEncryptionAvailable()) && (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text"), encrypt: value => safeStorage.encryptStringAsync(value), decrypt: value => safeStorage.decryptStringAsync(value) }; let activeSignIn = null; const cloudAccountStore = () => (activeSignIn ??= createCloudAccountStore({ file: path.join(app.getPath("userData"), cloudTarget(process.env).file), encryption: cloudEncryption }));
 function ensureCloudAccount() {
   if (cloudAccount) return cloudAccount;
-  if (!app.isPackaged || desktopRemoteAccess) throw new Error("MausBot Cloud sign-in requires the local desktop app.");
+  if (!app.isPackaged || desktopRemoteAccess) throw new Error("Nibble Cloud sign-in requires the local desktop app.");
   cloudAccount = createCloudAccountClient({
     store: cloudAccountStore(),
     platform: process.platform, deviceName: os.hostname().slice(0, 100) || "My computer", appVersion: app.getVersion(), origin: cloudTarget(process.env).origin,
@@ -1042,7 +1042,7 @@ async function runCompanyBackup(kind, input, scheduled = null) {
     const status = await localBackupStatus(proc);
     if (status.pendingRestore) {
       publishCompanyBackupState({ busy: false, pendingRestore: true });
-      throw new Error("Restart OpenMausBot to finish the pending restore before starting another backup operation.");
+      throw new Error("Restart Nibble to finish the pending restore before starting another backup operation.");
     }
     if (status.busy) throw companyBackupDeferred();
     const transfers = createCompanyBackups({
@@ -1076,7 +1076,7 @@ async function runCompanyBackup(kind, input, scheduled = null) {
 function syncDesktopMutationToken(proc) {
   try {
     proc.postMessage({
-      type: "openmausbot:desktop-mutation-token",
+      type: "nibble:desktop-mutation-token",
       token: desktopMutationToken,
       companionToken: companionMutationToken,
     });
@@ -1217,7 +1217,7 @@ function syncManagedComposioCredentials() {
   if (!serverProc) return;
   try {
     serverProc.postMessage({
-      type: "openmausbot:managed-composio",
+      type: "nibble:managed-composio",
       access: managedComposioAccess(composioBrokerUrl(), secureCredentials),
     });
   } catch (error) {
@@ -1251,7 +1251,7 @@ function notifyDesktopViewer(open) {
 }
 
 function openDesktopViewer(owner, rawUrl, rawTitle, contextId) {
-  if (!owner || owner.isDestroyed()) throw new Error("The OpenMausBot window is unavailable");
+  if (!owner || owner.isDestroyed()) throw new Error("The Nibble window is unavailable");
   const url = desktopViewerUrl(rawUrl);
   const titleCandidate = Object.prototype.toString.call(rawTitle) === "[object String]" ? rawTitle.trim() : "";
   const title = titleCandidate ? titleCandidate.slice(0, 80) : nativeT("native.viewer.fallbackTitle");
@@ -1351,7 +1351,7 @@ function openDesktopViewer(owner, rawUrl, rawTitle, contextId) {
 }
 
 function ensureDesktopWorkspace(owner) {
-  if (!owner || owner.isDestroyed()) throw new Error("The OpenMausBot window is unavailable");
+  if (!owner || owner.isDestroyed()) throw new Error("The Nibble window is unavailable");
   if (desktopWorkspaceManager) {
     if (desktopWorkspaceOwner !== owner) {
       throw new Error("The two-desktop view belongs to another app window");
@@ -1508,7 +1508,7 @@ function refreshApplicationMenu() {
       onSwitch: (id) => void workspaceMenuAction(() => switchEnvironment(id)),
       onAddFromClipboard: () => void addServerFromClipboard(),
       onConnect: () => void workspaceMenuAction(openWorkspaceSettings),
-      onOrganizationSignIn: () => queueOrganizationEntry("openmausbot://organization"),
+      onOrganizationSignIn: () => queueOrganizationEntry("nibble://organization"),
       onForget: (id) => void workspaceMenuAction(() => forgetEnvironment(id)),
       onOpenSettings: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("app:open-settings"); },
       openAtLogin: loginItem.available() ? { checked: loginItem.chosen(), onToggle: on => { loginItem.choose(on); refreshApplicationMenu(); } } : null,
@@ -1747,8 +1747,8 @@ async function deliverOrganizationEntry() {
 }
 
 async function openCloudEntry() {
-  if (!app.isPackaged) throw new Error("MausBot Cloud requires the installed desktop app.");
-  if (desktopRemoteAccess) throw new Error("This app is connected to another computer. Disconnect it to use MausBot Cloud on this computer.");
+  if (!app.isPackaged) throw new Error("Nibble Cloud requires the installed desktop app.");
+  if (desktopRemoteAccess) throw new Error("This app is connected to another computer. Disconnect it to use Nibble Cloud on this computer.");
   if (!serverReady) throw new Error("This installation is unavailable. Restart the app and open My Cloud again.");
   await cloudAccountRestored();
   if ((await homeWindow.refresh()).kind !== "computer") { await showHome({ place: "cloud" }); return true; }
@@ -1788,7 +1788,7 @@ async function addServerFromClipboard() {
 }
 
 const serverConnect = createServerConnect({ fetch: (...args) => session.defaultSession.fetch(...args), t: nativeT, tailnet: () => onTailnet(os.networkInterfaces()),
-  ownEnvironmentId: async () => (await (await localServerRequest("/.well-known/openmausbot/environment")).json())?.environmentId ?? null,
+  ownEnvironmentId: async () => (await (await localServerRequest("/.well-known/nibble/environment")).json())?.environmentId ?? null,
   ask: async (found) => (await dialog.showMessageBox({ type: "question", buttons: [nativeT("native.dialog.connect.button"), nativeT("native.common.cancel")], defaultId: 0, cancelId: 1,
     message: nativeT("native.dialog.connect.title", { host: found.label }), detail: nativeT(found.code || found.credential ? "native.dialog.connect.withCode" : "native.dialog.connect.noCode") })).response === 0,
   open: (found, name) => {
@@ -2460,7 +2460,7 @@ for (const method of ["state", "begin", "signInAgain", "reopen", "cancel", "refr
   ipcMain.handle(`cloud-account:${method}`, localWorkspaceOnly(`cloud-account:${method}`, () => (method === "signOut" ? accounts.signOutActive() : ensureCloudAccount()[method]())));
 }
 ipcMain.handle("cloud-account:checkout", localWorkspaceOnly("cloud-account:checkout", async (_event, plan, source) => {
-  if (!(await cloudOffersReady())) throw new Error("MausBot Cloud isn't offered in this app.");
+  if (!(await cloudOffersReady())) throw new Error("Nibble Cloud isn't offered in this app.");
   const client = ensureCloudAccount();
   if (typeof plan !== "string" || !CHECKOUT_SOURCES.includes(source)) throw new Error("Choose a plan to continue.");
   const offer = await client.offer();
@@ -2848,7 +2848,7 @@ app.whenReady().then(async () => { launchRecord.mark("ready");
   }
   installServerSessions({ app, defaultSession: session.defaultSession, serverPort: () => SERVER_PORT,
     ownerToken: () => (app.isPackaged && serverReady ? desktopMutationToken : null) });
-  if (app.isPackaged) app.setAsDefaultProtocolClient("openmausbot");
+  if (app.isPackaged) app.setAsDefaultProtocolClient("nibble");
   if (process.platform === "darwin") app.dock.setIcon(APP_ICON);
   secureCredentials = await bootHeadStart.take("credentials"); launchRecord.mark("keysRead");
   // An orphaned third-party key with no clear handler left: drop it rather than keep it at rest.

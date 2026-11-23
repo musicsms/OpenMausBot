@@ -142,9 +142,9 @@ describe("the listeners", () => {
     share = createTailnetShare({ port: port, handle: async () => {}, attach: () => {} });
     await share.start();
     const answers: object[] = [];
-    expect(share.receive({ type: "openmausbot:other" }, (answer) => answers.push(answer))).toBe(false);
-    const replied = new Promise<object>((resolve) => share!.receive({ type: "openmausbot:tailnet-share", share: { name: NAME, served: `https://${NAME}` } }, resolve));
-    expect(await replied).toEqual({ type: "openmausbot:tailnet-share-state", origin: `https://${NAME}`, listening: [], error: null });
+    expect(share.receive({ type: "nibble:other" }, (answer) => answers.push(answer))).toBe(false);
+    const replied = new Promise<object>((resolve) => share!.receive({ type: "nibble:tailnet-share", share: { name: NAME, served: `https://${NAME}` } }, resolve));
+    expect(await replied).toEqual({ type: "nibble:tailnet-share-state", origin: `https://${NAME}`, listening: [], error: null });
     expect(answers).toEqual([]);
   });
 });

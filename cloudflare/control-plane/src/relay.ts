@@ -1,4 +1,4 @@
-// MausBot Relay host tokens: `POST /v1/installations/self/relay-token`. The relay checks them offline with the public
+// Nibble Relay host tokens: `POST /v1/installations/self/relay-token`. The relay checks them offline with the public
 // key only, so this Worker's secret is the one thing that can let a computer onto the relay. Wire format: the
 // companion's e2e README, section 9 ("Relay token" and "Control plane endpoint").
 import { z } from "zod";
@@ -11,7 +11,7 @@ export const RELAY_TOKEN_TTL_S = 12 * 60 * 60;
 export const RELAY_REFRESH_AFTER_S = 60 * 60;
 export const RELAY_TOKEN_LIMIT = 60;
 const ADOPTION_WINDOW_MS = 30 * 24 * HOUR_MS;
-const RELAY_HOST = /^relay[1-9][0-9]?\.openmausbot\.com$/;
+const DNS_NAME = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 const KID = /^k[0-9]{1,3}$/;
 const VERSION = /^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,6}$/;
 const UUIDISH = /^[0-9a-f-]{36}$/;
@@ -79,7 +79,7 @@ export async function readRelaySettings(env: Env): Promise<RelaySettings | null>
   const nodes = listVar(vars.RELAY_NODES);
   const seed = typeof secret === "string" ? fromB64u(secret.trim()) : null;
   if (!seed || seed.length !== 32 || !KID.test(kid) || nodes.length === 0 || nodes.length > 4) return null;
-  if (!nodes.every((node) => RELAY_HOST.test(node))) return null;
+  if (!nodes.every((node) => typeof node === "string" && node.length <= 253 && DNS_NAME.test(node))) return null;
   const percent = Number(vars.RELAY_ROLLOUT_PERCENT ?? "0");
   let cached = cachedKey;
   if (!cached || cached.secret !== secret) {

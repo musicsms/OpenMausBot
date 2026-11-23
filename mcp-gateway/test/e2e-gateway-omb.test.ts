@@ -12,7 +12,7 @@ import { GitHubAdapter } from "../src/adapters/github-adapter.ts";
 import { createGatewayServer } from "../src/mcp/sse-server.ts";
 import { TEST_INTERNAL_KEY, sseAuthOptions, authHeaders } from "./test-auth.ts";
 
-describe("E2E Gateway -> OpenMausBot Client", () => {
+describe("E2E Gateway -> Nibble Client", () => {
   let testDir: string;
   let server: Server;
   let port: number;

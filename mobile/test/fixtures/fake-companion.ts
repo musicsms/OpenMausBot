@@ -47,7 +47,7 @@ export function createFakeCompanionServer(options?: { token?: string }) {
 
     void (async () => {
       if (method === "GET" && path === "/api/health") {
-        return sendJson(res, 200, { app: "openmausbot" });
+        return sendJson(res, 200, { app: "nibble" });
       }
 
       if (method === "POST" && path === "/api/pair") {
@@ -106,7 +106,7 @@ export function createFakeCompanionServer(options?: { token?: string }) {
               id: "m1",
               role: "bot",
               kind: "text",
-              text: "Xin chào! Tôi là OpenMausBot trên mobile.",
+              text: "Xin chào! Tôi là Nibble trên mobile.",
               botId: BOT_ID,
             },
           })}\n\n`,

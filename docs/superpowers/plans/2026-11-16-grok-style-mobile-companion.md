@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a native Flutter mobile client under `mobile/` with a Grok-style OLED dark design language that connects securely to OpenMausBot's `companion` sidecar (`:8810`) for real-time SSE streaming chat, QR pairing, and interactive tool approval cards.
+**Goal:** Build a native Flutter mobile client under `mobile/` with a Grok-style OLED dark design language that connects securely to Nibble's `companion` sidecar (`:8810`) for real-time SSE streaming chat, QR pairing, and interactive tool approval cards.
 
 **Architecture:** A standalone Flutter 3.x project in `mobile/` communicating exclusively with `companion` (`:8810`). Includes:
 - A secure pairing service (`flutter_secure_storage`) capturing device tokens via QR/6-digit code.
@@ -12,14 +12,14 @@
 
 **Tech Stack:** Flutter 3.24.5 (Dart 3.5.4), `flutter_markdown`, `flutter_secure_storage`, `mobile_scanner`, `http`, Node.js test fixture.
 
-**Spec:** [docs/superpowers/specs/2026-11-16-grok-style-mobile-companion-design.md](file:///home/ubuntu/OpenMausBot/docs/superpowers/specs/2026-11-16-grok-style-mobile-companion-design.md)
+**Spec:** [docs/superpowers/specs/2026-11-16-grok-style-mobile-companion-design.md](file:///home/ubuntu/Nibble/docs/superpowers/specs/2026-11-16-grok-style-mobile-companion-design.md)
 
 ## Global Constraints
 
 - The mobile app must communicate exclusively with the `companion` sidecar (`:8810`) and never attempt to bind or connect to the loopback-only harness (`:8799`).
 - Device tokens must be stored exclusively in platform-encrypted secure storage (Keychain / EncryptedSharedPreferences).
 - All requests must carry `Authorization: Bearer <deviceToken>`.
-- Adhere strictly to `OpenMausBot/AGENTS.md` coding standards: write comments only for what the code cannot say; no narrative comments; never suppress correctness lint rules.
+- Adhere strictly to `Nibble/AGENTS.md` coding standards: write comments only for what the code cannot say; no narrative comments; never suppress correctness lint rules.
 - Isolated verification only (per `docs/verification/README.md`): all tests run against mock companion fixtures, never mutating live desktop data.
 
 ---
@@ -34,7 +34,7 @@
 
 **Interfaces:**
 - Produces: Base Flutter application structure, dependencies for secure storage, markdown, scanner, and HTTP.
-- Produces: App entrypoint `MausBotApp`.
+- Produces: App entrypoint `NibbleApp`.
 
 - [ ] **Step 1: Write the failing test for app scaffolding**
 
@@ -44,9 +44,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/main.dart';
 
 void main() {
-  testWidgets('MausBotApp loads and renders base title', (WidgetTester tester) async {
-    await tester.pumpWidget(const MausBotApp());
-    expect(find.text('OpenMausBot'), findsOneWidget);
+  testWidgets('NibbleApp loads and renders base title', (WidgetTester tester) async {
+    await tester.pumpWidget(const NibbleApp());
+    expect(find.text('Nibble'), findsOneWidget);
   });
 }
 ```
@@ -61,7 +61,7 @@ Expected: FAIL (files do not exist yet)
 Create `mobile/pubspec.yaml`:
 ```yaml
 name: mobile
-description: "Grok-style mobile companion for OpenMausBot"
+description: "Grok-style mobile companion for Nibble"
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -98,16 +98,16 @@ Create `mobile/lib/main.dart`:
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MausBotApp());
+  runApp(const NibbleApp());
 }
 
-class MausBotApp extends StatelessWidget {
-  const MausBotApp({super.key});
+class NibbleApp extends StatelessWidget {
+  const NibbleApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'OpenMausBot',
+      title: 'Nibble',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: Colors.black,
         colorScheme: const ColorScheme.dark(
@@ -117,7 +117,7 @@ class MausBotApp extends StatelessWidget {
       ),
       home: const Scaffold(
         body: Center(
-          child: Text('OpenMausBot', style: TextStyle(color: Colors.white, fontSize: 24)),
+          child: Text('Nibble', style: TextStyle(color: Colors.white, fontSize: 24)),
         ),
       ),
     );
@@ -429,7 +429,7 @@ class PairingPayload {
       port: (data['port'] as num).toInt(),
       remoteUrl: data['remoteUrl'] as String?,
       pairingSecret: data['pairingSecret'] as String,
-      machineName: data['machineName'] as String? ?? 'OpenMausBot Desktop',
+      machineName: data['machineName'] as String? ?? 'Nibble Desktop',
     );
   }
 
@@ -530,7 +530,7 @@ class _PairingViewState extends State<PairingView> {
             ),
             const SizedBox(height: 32),
             const Text(
-              'Scan QR code from OpenMausBot Desktop Settings → Mobile',
+              'Scan QR code from Nibble Desktop Settings → Mobile',
               textAlign: TextAlign.center,
               style: TextStyle(color: GrokTheme.textMuted, fontSize: 14),
             ),
@@ -618,7 +618,7 @@ void main() {
         return http.Response('{"status":"ok"}', 200);
       }
       if (request.url.path.contains('/messages')) {
-        return http.Response('data: Hello world\n\ndata: from OpenMausBot\n\n', 200, headers: {
+        return http.Response('data: Hello world\n\ndata: from Nibble\n\n', 200, headers: {
           'content-type': 'text/event-stream',
         });
       }
@@ -632,7 +632,7 @@ void main() {
     );
 
     final chunks = await sseClient.streamMessages('th-123').toList();
-    expect(chunks, ['Hello world', 'from OpenMausBot']);
+    expect(chunks, ['Hello world', 'from Nibble']);
   });
 }
 ```
@@ -882,7 +882,7 @@ class _ChatViewState extends State<ChatView> {
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('OpenMausBot', style: TextStyle(color: Colors.white, fontSize: 16)),
+                Text('Nibble', style: TextStyle(color: Colors.white, fontSize: 16)),
                 Text('Online • LAN', style: TextStyle(color: GrokTheme.approvalGreen, fontSize: 11)),
               ],
             ),
@@ -1236,7 +1236,7 @@ export function createFakeCompanionServer() {
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
       });
-      res.write("data: Xin chào! Tôi là OpenMausBot trên mobile.\n\n");
+      res.write("data: Xin chào! Tôi là Nibble trên mobile.\n\n");
       res.write("data: Đang chuẩn bị thực hiện task...\n\n");
       setTimeout(() => res.end(), 100);
       return;

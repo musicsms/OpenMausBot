@@ -7,11 +7,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:mobile/core/e2e/descriptor.dart';
-import 'package:mobile/core/network/sse_client.dart';
-import 'package:mobile/core/storage/pairing_storage.dart';
-import 'package:mobile/features/pairing/pairing_model.dart';
-import 'package:mobile/features/pairing/pairing_view.dart';
+import 'package:nibble/core/e2e/descriptor.dart';
+import 'package:nibble/core/network/sse_client.dart';
+import 'package:nibble/core/storage/pairing_storage.dart';
+import 'package:nibble/features/pairing/pairing_model.dart';
+import 'package:nibble/features/pairing/pairing_view.dart';
 
 void main() {
   group('PairingPayload', () {
@@ -37,13 +37,13 @@ void main() {
       expect(payload.port, 8810);
       expect(payload.remoteUrl, isNull);
       expect(payload.credential, 'sec456');
-      expect(payload.machineName, 'OpenMausBot Desktop');
+      expect(payload.machineName, 'Desktop');
       expect(payload.lanUrl, 'http://10.0.0.5:8810');
     });
 
-    test('PairingPayload parses openmausbot://pair URI format', () {
+    test('PairingPayload parses nibble://pair URI format', () {
       const rawUri =
-          'openmausbot://pair?address=192.168.1.80:8810&token=omb_pair_secret789&name=HomeServer&remoteUrl=https%3A%2F%2Fremote.omb%3A8810';
+          'nibble://pair?address=192.168.1.80:8810&token=omb_pair_secret789&name=HomeServer&remoteUrl=https%3A%2F%2Fremote.omb%3A8810';
       final payload = PairingPayload.fromJsonString(rawUri);
       expect(payload.host, '192.168.1.80');
       expect(payload.port, 8810);
@@ -60,14 +60,14 @@ void main() {
       ]);
       final encoded = base64Url.encode(utf8.encode(endpointsJson)).replaceAll('=', '');
       final rawUri =
-          'openmausbot://pair?address=192.168.1.9:8810&token=omb_pair_${'a' * 43}&name=Desk&endpoints=$encoded';
+          'nibble://pair?address=192.168.1.9:8810&token=omb_pair_${'a' * 43}&name=Desk&endpoints=$encoded';
       final payload = PairingPayload.fromJsonString(rawUri);
       expect(payload.endpoints.length, 2);
       expect(payload.endpoints.first.kind, 'hosted');
       expect(payload.dialUrl, 'https://c-abc.openmausbot.com');
     });
 
-    test('PairingPayload extracts e2e query parameter from openmausbot://pair URI', () {
+    test('PairingPayload extracts e2e query parameter from nibble://pair URI', () {
       final desc = E2EDescriptor.parseJson({
         'v': 1,
         'k': 'BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0',
@@ -75,7 +75,7 @@ void main() {
         'r': ['relay.example.com'],
       });
       final rawUri =
-          'openmausbot://pair?address=192.168.1.80:8810&token=omb_pair_secret789&name=HomeServer&e2e=${desc.toB64u()}';
+          'nibble://pair?address=192.168.1.80:8810&token=omb_pair_secret789&name=HomeServer&e2e=${desc.toB64u()}';
       final payload = PairingPayload.fromJsonString(rawUri);
       expect(payload.e2e, isNotNull);
       expect(payload.e2e!.k, desc.k);
@@ -84,17 +84,17 @@ void main() {
     });
 
     test('PairingPayload strictly rejects malformed e2e invites instead of falling back to plaintext', () {
-      const badB64Uri = 'openmausbot://pair?token=sec&e2e=not_valid_b64!';
+      const badB64Uri = 'nibble://pair?token=sec&e2e=not_valid_b64!';
       expect(() => PairingPayload.fromJsonString(badB64Uri), throwsA(isA<FormatException>()));
 
       const badKeyJson = '{"v":1,"k":"short"}';
       final badKeyB64 = base64Url.encode(utf8.encode(badKeyJson)).replaceAll('=', '');
-      final badKeyUri = 'openmausbot://pair?token=sec&e2e=$badKeyB64';
+      final badKeyUri = 'nibble://pair?token=sec&e2e=$badKeyB64';
       expect(() => PairingPayload.fromJsonString(badKeyUri), throwsA(isA<FormatException>()));
 
       const badHostJson = '{"v":1,"k":"BJiFmi3bzpQUayMJErl6eqt24mUOvHEUR6uzutPTHfundIgyZxs3bSzUMydGOfgbWdwQshIyzzlMWqxMkNHnmd0","h":"lz81isB3BuNV6rHgYgG3Wg","r":["bad_host!!"]}';
       final badHostB64 = base64Url.encode(utf8.encode(badHostJson)).replaceAll('=', '');
-      final badHostUri = 'openmausbot://pair?token=sec&e2e=$badHostB64';
+      final badHostUri = 'nibble://pair?token=sec&e2e=$badHostB64';
       expect(() => PairingPayload.fromJsonString(badHostUri), throwsA(isA<FormatException>()));
 
       const badJsonPayload = '{"host":"1.2.3.4","credential":"sec","e2e":"bad"}';
@@ -156,7 +156,7 @@ void main() {
       var plainHttpCalled = false;
       final mockHttp = MockClient((request) async {
         plainHttpCalled = true;
-        return http.Response('{"app":"openmausbot"}', 200);
+        return http.Response('{"app":"nibble"}', 200);
       });
 
       final desc = E2EDescriptor.parseJson({

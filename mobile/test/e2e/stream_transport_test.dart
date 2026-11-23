@@ -3,8 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:mobile/core/e2e/stream_transport.dart';
-import 'package:mobile/core/e2e/yamux.dart';
+import 'package:nibble/core/e2e/stream_transport.dart';
+import 'package:nibble/core/e2e/yamux.dart';
 
 void main() {
   group('HTTP/1.1 over Yamux Stream', () {
@@ -175,9 +175,9 @@ void main() {
               const reply =
                   'HTTP/1.1 200 OK\r\n'
                   'Content-Type: application/json\r\n'
-                  'Content-Length: 21\r\n'
+                  'Content-Length: 16\r\n'
                   '\r\n'
-                  '{"app":"openmausbot"}';
+                  '{"app":"nibble"}';
               stream.add(utf8.encode(reply));
               stream.finish();
             }
@@ -191,7 +191,7 @@ void main() {
 
       expect(response.statusCode, equals(200));
       expect(response.headers['content-type'], equals('application/json'));
-      expect(await response.stream.bytesToString(), equals('{"app":"openmausbot"}'));
+      expect(await response.stream.bytesToString(), equals('{"app":"nibble"}'));
       expect(serverReceived[1], isNotNull);
       final rawServerText = utf8.decode(serverReceived[1]!);
       expect(rawServerText, contains('Host: phone-relay.invalid\r\n'));

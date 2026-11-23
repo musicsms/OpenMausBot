@@ -12,7 +12,7 @@ describe("a terminal signs in with one click in the desktop app", () => {
     });
     return { status: response.status, body: await response.json().catch(() => ({})) as Record<string, any> };
   };
-  const asApp = (method: string, path: string, body?: unknown) => call(method, path, body, { "x-openmausbot-desktop-owner": owner, origin: fixture.info.url });
+  const asApp = (method: string, path: string, body?: unknown) => call(method, path, body, { "x-nibble-desktop-owner": owner, origin: fixture.info.url });
   const ask = async (scope?: "client") => {
     const verifier = randomBytes(32).toString("base64url");
     const verifierHash = createHash("sha256").update(verifier).digest("base64url");
@@ -23,7 +23,7 @@ describe("a terminal signs in with one click in the desktop app", () => {
   beforeAll(async () => {
     // The launcher names its starter bot as the app would; every request in the tests below says who sends it.
     const realFetch = globalThis.fetch;
-    globalThis.fetch = (input, init = {}) => realFetch(input, { ...init, headers: { ...Object.fromEntries(new Headers(init.headers)), "x-openmausbot-desktop-owner": owner } });
+    globalThis.fetch = (input, init = {}) => realFetch(input, { ...init, headers: { ...Object.fromEntries(new Headers(init.headers)), "x-nibble-desktop-owner": owner } });
     try {
       fixture = await launchVerificationServer({ ...process.env, OMB_TEST_DESKTOP_OWNER_TOKEN: owner });
     } finally {

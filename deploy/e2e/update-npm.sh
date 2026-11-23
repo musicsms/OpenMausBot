@@ -47,15 +47,15 @@ if (!process.argv.includes('--http-child')) {
   createServer((req, res) => {
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify(req.url === '/api/health/engines'
-      ? { app: 'openmausbot', engines: ['0.1.3', '0.1.4', '0.1.5'].includes(version) ? 0 : 1 }
-      : { app: 'openmausbot', version, pid: process.pid }));
+      ? { app: 'nibble', engines: ['0.1.3', '0.1.4', '0.1.5'].includes(version) ? 0 : 1 }
+      : { app: 'nibble', version, pid: process.pid }));
   }).listen(port, '127.0.0.1');
 }
 JS
 chmod 755 "$fixture/package/cli.js"
 for version in 0.1.1 0.1.2 0.1.3 0.1.4 0.1.5; do
   jq -n --arg version "$version" --arg dep "file:$fixture/update-fixture-dependency-1.0.0.tgz" \
-    '{name:"openmausbot", $version, bin:{openmausbot:"cli.js"}, dependencies:{"update-fixture-dependency":$dep}}' >"$fixture/package/package.json"
+    '{name:"openmausbot", $version, bin:{nibble:"cli.js"}, dependencies:{"update-fixture-dependency":$dep}}' >"$fixture/package/package.json"
   "$npm_bin" pack --quiet --pack-destination "$fixture" "$fixture/package"
 done
 as_account "$npm_bin" install --offline --global --prefix "$home/.local" "$fixture/openmausbot-0.1.1.tgz"
@@ -71,7 +71,7 @@ chmod 755 "$home/.local/bin/npm"
 chown "$account:$account" "$home/.local/bin/npm"
 cat >/usr/sbin/curl <<'EOF'
 #!/bin/bash
-if [[ "${!#}" == https://raw.githubusercontent.com/milind-soni/OpenMausBot/channels/stable.json ]]; then
+if [[ "${!#}" == https://raw.githubusercontent.com/milind-soni/Nibble/channels/stable.json ]]; then
   cat /var/lib/omb-npm-update-fixture/stable.json
 else
   exec /usr/bin/curl "$@"
@@ -82,7 +82,7 @@ chmod 755 /usr/sbin/curl /usr/sbin/sleep
 
 cat >"$unit_file" <<EOF
 [Unit]
-Description=OpenMausBot npm update fixture
+Description=Nibble npm update fixture
 
 [Service]
 User=$account
@@ -143,7 +143,7 @@ new_pid=$(health pid)
 [[ $(health pid) == "$new_pid" ]]
 
 stable 0.1.3
-expect_failure 'OpenMausBot 0.1.2 is running again'
+expect_failure 'Nibble 0.1.2 is running again'
 [[ $(health version) == 0.1.2 && ! -e $home/.openmausbot/0.1.3 && ! -e $journal ]]
 compgen -G "$home/.openmausbot-update.*/failed-data.*/data/0.1.3" >/dev/null
 

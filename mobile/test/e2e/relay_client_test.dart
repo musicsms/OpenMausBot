@@ -6,12 +6,12 @@ import 'dart:typed_data';
 import 'package:convert/convert.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:mobile/core/e2e/credentials.dart';
-import 'package:mobile/core/e2e/crypto.dart';
-import 'package:mobile/core/e2e/descriptor.dart';
-import 'package:mobile/core/e2e/noise.dart';
-import 'package:mobile/core/e2e/relay_client.dart';
-import 'package:mobile/core/e2e/yamux.dart';
+import 'package:nibble/core/e2e/credentials.dart';
+import 'package:nibble/core/e2e/crypto.dart';
+import 'package:nibble/core/e2e/descriptor.dart';
+import 'package:nibble/core/e2e/noise.dart';
+import 'package:nibble/core/e2e/relay_client.dart';
+import 'package:nibble/core/e2e/yamux.dart';
 
 class MockRelayWebSocket implements RelayWebSocket {
   final StreamController<dynamic> _incoming = StreamController<dynamic>.broadcast();

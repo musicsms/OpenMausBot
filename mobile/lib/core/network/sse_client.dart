@@ -161,7 +161,7 @@ class SseNetworkClient {
           .timeout(const Duration(milliseconds: 1500));
       if (res.statusCode != 200) return false;
       final body = jsonDecode(res.body);
-      return body is Map && body['app'] == 'openmausbot';
+      return body is Map && body['app'] == 'nibble';
     } catch (_) {
       return false;
     }

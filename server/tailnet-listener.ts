@@ -100,7 +100,7 @@ export function createTailnetShare(options: TailnetShareOptions) {
     const answer = JSON.stringify(share.state());
     if (!tellParent || answer === toldParent) return;
     toldParent = answer;
-    tellParent({ type: "openmausbot:tailnet-share-state", ...share.state() });
+    tellParent({ type: "nibble:tailnet-share-state", ...share.state() });
   }
 
   const guarded: Handle = async (req, res) => {
@@ -203,12 +203,12 @@ export function createTailnetShare(options: TailnetShareOptions) {
     },
     /** The desktop app's private message; anything else is not ours. Replies with the state once it is applied. */
     receive(message: unknown, reply: (answer: object) => void): boolean {
-      if (!message || typeof message !== "object" || (message as { type?: unknown }).type !== "openmausbot:tailnet-share") return false;
+      if (!message || typeof message !== "object" || (message as { type?: unknown }).type !== "nibble:tailnet-share") return false;
       tellParent = reply;
       const config = readTailnetShare((message as { share?: unknown }).share);
       void share.apply(config).then(() => {
         toldParent = JSON.stringify(share.state());
-        reply({ type: "openmausbot:tailnet-share-state", ...share.state() });
+        reply({ type: "nibble:tailnet-share-state", ...share.state() });
       });
       return true;
     },

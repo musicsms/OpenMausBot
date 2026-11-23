@@ -1,8 +1,8 @@
-# Phones through MausBot Relay on a self-hosted server
+# Phones through Nibble Relay on a self-hosted server
 
-`openmausbot serve --relay` lets the MausBot phone app pair with a server on a
+`openmausbot serve --relay` lets the Nibble phone app pair with a server on a
 VPS by scanning a QR code, from anywhere: no domain, no open port, no VPN and
-no tunnel address. The server dials out to MausBot Relay, the phone dials the
+no tunnel address. The server dials out to Nibble Relay, the phone dials the
 relay, and the relay passes sealed bytes it cannot open. It is the same
 end-to-end encrypted connection the desktop app gives phones; the wire spec is
 [`companion/src/e2e/README.md`](../companion/src/e2e/README.md).
@@ -69,7 +69,7 @@ same code, imported from `companion/src/e2e/`) and hands each stream to its own
 request handler. It adds the `e2e` descriptor to the `/api/pair` answer and
 answers `/api/companion/endpoints` itself, as the sidecar does.
 
-The QR is the desktop's: an `openmausbot://pair` link with the one-time pairing
+The QR is the desktop's: an `nibble://pair` link with the one-time pairing
 credential and `e2e={v:1,k,h,r}` (the server's connection key, its relay host
 id and the relay nodes). With a public HTTPS address it has the shape of the
 desktop's default QR: that address as the hosted endpoint, which a phone
@@ -211,7 +211,7 @@ not paired.
 **Not a way around the server's sign-in.** A relayed request reaches the
 server's request handler with no peer address, which `request-auth.ts` always
 treats as remote; its `Host`, proxy headers, cookies and every
-`x-openmausbot-*` header are replaced or removed first. So it is never loopback,
+`x-nibble-*` header are replaced or removed first. So it is never loopback,
 never owner or service trust: it needs a session bearer, the session's scopes
 apply (a chat-only phone stays chat-only), and a Team server's per-person rules
 apply. Inside one encrypted session only the session whose key opened it is
@@ -242,7 +242,7 @@ Each stream must send complete request headers within 30 seconds of opening or
 of its last answer, and a request's whole body within 5 minutes, or it is
 closed. The control plane: 60 relay tokens an hour per installation.
 
-It never runs on a MausBot Cloud, a hosted workspace or the desktop app (whose
+It never runs on a Nibble Cloud, a hosted workspace or the desktop app (whose
 companion already carries phones), whatever the environment says.
 
 ## When the relay cannot be reached
@@ -252,17 +252,17 @@ The server keeps working on every other way in; the relay only adds one. What
 
 | Situation | Line |
 |---|---|
-| The machine serves a tunnel, runs on a fleet credential or holds a tunnel address | MausBot Relay stays off here: (why). A relay token would make that tunnel go for good; use the relay on a machine signed in with `openmausbot login --relay`. |
-| Not signed in, or the sign-in expired | MausBot Relay needs this machine signed in to a MausBot account: `openmausbot login --relay` |
-| The control plane says no (rollout, blocked, switched off) | MausBot Relay is not available for this machine right now. The server keeps working here; it asks again every half hour. |
-| The control plane does not answer | The MausBot account service did not answer. The server keeps working here and keeps trying. |
-| The relay does not answer | Can't reach MausBot Relay yet. The server keeps working here and keeps trying; phones pair once it connects. |
+| The machine serves a tunnel, runs on a fleet credential or holds a tunnel address | Nibble Relay stays off here: (why). A relay token would make that tunnel go for good; use the relay on a machine signed in with `openmausbot login --relay`. |
+| Not signed in, or the sign-in expired | Nibble Relay needs this machine signed in to a Nibble account: `openmausbot login --relay` |
+| The control plane says no (rollout, blocked, switched off) | Nibble Relay is not available for this machine right now. The server keeps working here; it asks again every half hour. |
+| The control plane does not answer | The Nibble account service did not answer. The server keeps working here and keeps trying. |
+| The relay does not answer | Can't reach Nibble Relay yet. The server keeps working here and keeps trying; phones pair once it connects. |
 
 The server log says `phone relay: connecting`, `phone relay: connected via
-relay2.openmausbot.com` and `phone relay: relay token …`. It redials at once,
+relay2.example.com` and `phone relay: relay token …`. It redials at once,
 then backs off to a minute, moves to the next node on a restart or refusal, and
 renews its token hourly; sessions already open survive a token renewal. A phone
-that cannot reach the relay shows "Can't reach MausBot Relay right now. Trying
+that cannot reach the relay shows "Can't reach Nibble Relay right now. Trying
 again…".
 
 ## Not yet

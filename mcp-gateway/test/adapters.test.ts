@@ -274,7 +274,7 @@ describe("Service Adapters", () => {
       expect(url).toContain("https://api.github.com/user/repos");
       expect(url).toContain("visibility=public");
       expect(init.headers["Authorization"]).toBe("Bearer ghp_mock_pat_123");
-      expect(init.headers["User-Agent"]).toBe("OpenMausBot-Unified-Gateway");
+      expect(init.headers["User-Agent"]).toBe("Nibble-Unified-Gateway");
       expect(init.headers["Accept"]).toBe("application/vnd.github+json");
     });
 

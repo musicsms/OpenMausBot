@@ -31,10 +31,10 @@ import { SPAWNED_PROXIES } from "./proxy-paths.ts";
 import { dockerCliMissing, dockerCliMissingProblem } from "./vps-hints.ts";
 
 export const VPS_IMAGE = CUA_IMAGE;
-export const VPS_MANAGED_LABEL = "com.openmausbot.vps";
-export const VPS_CONTAINER_LABEL = "com.openmausbot.container";
-export const VPS_ENVIRONMENT_LABEL = "com.openmausbot.environment";
-export const VPS_VIEWER_LABEL = "com.openmausbot.vps-viewer";
+export const VPS_MANAGED_LABEL = "com.nibble.vps";
+export const VPS_CONTAINER_LABEL = "com.nibble.container";
+export const VPS_ENVIRONMENT_LABEL = "com.nibble.environment";
+export const VPS_VIEWER_LABEL = "com.nibble.vps-viewer";
 export const VPS_CONTAINER_PREFIX = "openmausbot-vps";
 export { dockerCliInstallCommand, vpsStartsForTurn, vpsUnavailableHint } from "./vps-hints.ts";
 // Lazy: index must finish data migration and take the writer lease before this may create the data directory.
@@ -366,14 +366,14 @@ function hasNoPublishedPorts(config: {
 function statusProblem(status: VpsComputerStatus): string | null {
   if (!status.configured) return "Configure a VPS SSH alias in AI › Other services";
   if (!status.daemonUp) return "Docker over SSH could not reach the VPS; check the SSH alias and Docker on the VPS";
-  if (!status.image) return `Prepare the pinned OpenMausBot Cua image on the VPS (Driver ${CUA_DRIVER_VERSION})`;
-  if (status.container === "missing") return "No OpenMausBot container exists for this bot on the VPS";
-  if (!status.imageMatches) return "The VPS container uses an incompatible or untrusted OpenMausBot image";
-  if (!status.managed) return "The VPS container name is occupied by a container OpenMausBot did not create";
+  if (!status.image) return `Prepare the pinned Nibble Cua image on the VPS (Driver ${CUA_DRIVER_VERSION})`;
+  if (status.container === "missing") return "No Nibble container exists for this bot on the VPS";
+  if (!status.imageMatches) return "The VPS container uses an incompatible or untrusted Nibble image";
+  if (!status.managed) return "The VPS container name is occupied by a container Nibble did not create";
   if (status.network === "unsafe") return "The VPS container uses an unapproved network or publishes ports; refusing to use it";
   if (status.mounts === "unsafe") return "The VPS container has host mounts; refusing to use it";
   if (status.security === "unsafe") return "The VPS container has unsupported privilege, isolation, or automatic-removal settings";
-  if (status.container === "stopped") return "The OpenMausBot VPS container is stopped";
+  if (status.container === "stopped") return "The Nibble VPS container is stopped";
   if (status.desktop_error) return `The VPS Cua desktop failed to start: ${status.desktop_error}`;
   if (!status.desktopReady) return "The VPS container started, but Cua Driver is not ready yet";
   return null;
@@ -1001,7 +1001,7 @@ export async function vpsComputerAction(
         if (before.container === "missing") return before;
         if (!before.managed) {
           throw Object.assign(
-            new Error("The VPS container name is occupied by a container OpenMausBot did not create — remove it on the VPS yourself"),
+            new Error("The VPS container name is occupied by a container Nibble did not create — remove it on the VPS yourself"),
             { status: 409 },
           );
         }

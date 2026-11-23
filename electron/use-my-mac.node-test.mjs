@@ -31,7 +31,7 @@ function cloudHome({ link = true, chrome = false } = {}) {
     const route = new URL(url).pathname;
     state.calls.push(route);
     if (route === "/api/auth/session") return json({ kind: "session", id: state.sessionId, scopes: ["admin", "client"], cloudHome: true });
-    if (route === "/.well-known/openmausbot/environment") return json({ environmentId: state.environmentId, capabilities: { sharedComputers: true, lendingDetails: true, ...(link ? { deviceLink: true } : {}), ...(chrome ? { myChromeLink: true } : {}) } });
+    if (route === "/.well-known/nibble/environment") return json({ environmentId: state.environmentId, capabilities: { sharedComputers: true, lendingDetails: true, ...(link ? { deviceLink: true } : {}), ...(chrome ? { myChromeLink: true } : {}) } });
     const body = init?.body ? JSON.parse(init.body) : {};
     if (route === "/api/shared-computers/connect") { state.connects.push(body); state.registered.add(body.id); return json({ ok: true }); }
     if (route.endsWith("/poll")) {
@@ -245,11 +245,11 @@ test("lending on opens the app at login, out of sight; off removes only the logi
   assert.equal(theirs.settings.openAtLogin, true, "a login item the person set up is theirs");
   assert.equal(kept.startedHidden(), false, "and it opens the window as before");
   const windows = fakeApp();
-  const win = createOpenAtLogin({ app: windows, file: path.join(dir, "win.json"), platform: "win32", home: dir, argv: ["OpenMausBot.exe", HIDDEN_ARG] });
+  const win = createOpenAtLogin({ app: windows, file: path.join(dir, "win.json"), platform: "win32", home: dir, argv: ["Nibble.exe", HIDDEN_ARG] });
   win.follow(true);
   assert.deepEqual(calls.filter(([kind]) => kind === "set").at(-1), ["set", { openAtLogin: true, args: [HIDDEN_ARG] }]);
   assert.equal(win.startedHidden(), true);
-  assert.equal(createOpenAtLogin({ app: windows, file: path.join(dir, "win.json"), platform: "win32", home: dir, argv: ["OpenMausBot.exe"] }).startedHidden(), false);
+  assert.equal(createOpenAtLogin({ app: windows, file: path.join(dir, "win.json"), platform: "win32", home: dir, argv: ["Nibble.exe"] }).startedHidden(), false);
   const config = path.join(dir, "config");
   const linux = createOpenAtLogin({ app: fakeApp(), file: path.join(dir, "linux.json"), platform: "linux", home: dir, env: { XDG_CONFIG_HOME: config, APPIMAGE: "/home/me/Apps/Open Maus$Bot.AppImage" } });
   linux.follow(true);

@@ -1,6 +1,6 @@
 # mcp-gateway (Phase-1 auth)
 
-Loopback-only sidecar that exposes provider tools to OpenMausBot over MCP SSE.
+Loopback-only sidecar that exposes provider tools to Nibble over MCP SSE.
 Supports PAT accounts plus **Google OAuth** (consent + refresh), optional
 AES-256-GCM auth-dir encryption, and a structured tool-error contract
 (`auth_required`, rate-limit retries, Zod param validation).
@@ -78,7 +78,7 @@ dropping accounts.
 Google refresh tokens are refreshed in the background when a handler is
 registered at bootstrap (Google is wired; missing handlers no-op safely).
 
-## Connect OpenMausBot
+## Connect Nibble
 
 Use the helper in `server/mcp-preset-gateway.ts`:
 
@@ -114,5 +114,5 @@ pnpm --filter mcp-gateway test
 ## Out of scope (later slices)
 
 - Custom REST YAML load + SSRF controls
-- OpenMausBot Settings 1-click UX
+- Nibble Settings 1-click UX
 - Public / non-loopback production bind

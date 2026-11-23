@@ -56,7 +56,7 @@ async function req(method, path, { body, auth } = {}) {
 }
 
 const health = await req("GET", "/api/health");
-if (health.status !== 200 || health.json?.app !== "openmausbot") {
+if (health.status !== 200 || health.json?.app !== "nibble") {
   fail(`health failed: ${JSON.stringify(health)}`);
 }
 

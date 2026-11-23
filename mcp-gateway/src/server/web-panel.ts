@@ -44,7 +44,7 @@ export function renderDashboardHtml(accounts: AccountCredential[]): string {
 <body>
   <div class="card">
     <h1>Unified MCP Gateway</h1>
-    <p>Local multi-account OAuth gateway for OpenMausBot (loopback; bearer required on API)</p>
+    <p>Local multi-account OAuth gateway for Nibble (loopback; bearer required on API)</p>
     <h2>Connected Accounts</h2>
     <table>
       <thead>

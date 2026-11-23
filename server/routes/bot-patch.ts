@@ -113,7 +113,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
       if (!body || typeof body !== "object" || Array.isArray(body)) {
         return json(res, 400, { error: "body must be a JSON object" });
       }
-      const pairedDevice = req.headers["x-openmausbot-companion"] === "1";
+      const pairedDevice = req.headers["x-nibble-companion"] === "1";
       if ((auth.kind === "session" && !auth.scopes.includes("admin")) || pairedDevice) {
         const session = auth.kind === "session" ? auth.session : undefined;
         const level = pairedDevice ? "chat" : deps.levelOf(auth, m[1]);
@@ -209,7 +209,7 @@ export function createBotPatchRoutes(deps: BotPatchRouteDeps): RouteHandler {
       for (const key of ["unread", "cloudBackend", "color", "mascotExpression", "mascotBody", "pinned", "hidden", "sidebarHidden", "welcomed"] as const) {
         if (body[key] !== undefined) patch[key] = body[key];
       }
-      // null clears the default-bot mark, demoting the bot to a regular (deletable) one. MausBot's Show switch goes
+      // null clears the default-bot mark, demoting the bot to a regular (deletable) one. Nibble's Show switch goes
       // with it: a regular bot is never hidden this way, and has no switch to show it again.
       if (body.defaultBot === null && existingBot?.defaultBot) Object.assign(patch, { defaultBot: undefined, sidebarHidden: undefined });
       const computerSpecified = Object.prototype.hasOwnProperty.call(body, "computer");

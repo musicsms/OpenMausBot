@@ -151,7 +151,7 @@ export class SavedServers {
 
   private putToken(name: string, token: string): SavedServer["store"] {
     if (this.platform === "darwin") {
-      const added = this.security(["-i"], `add-generic-password -U -s ${quoted(KEYCHAIN_SERVICE)} -a ${quoted(name)} -l ${quoted(`OpenMausBot CLI: ${name}`)} -w ${quoted(token)}\n`);
+      const added = this.security(["-i"], `add-generic-password -U -s ${quoted(KEYCHAIN_SERVICE)} -a ${quoted(name)} -l ${quoted(`Nibble CLI: ${name}`)} -w ${quoted(token)}\n`);
       if (added.status === 0) return "keychain";
     }
     if (!this.dir) throw new HeadlessError("no home folder to keep the sign-in in", EXIT.failed, "set HOME");
@@ -181,7 +181,7 @@ export function savedSessionHeaders(origin: string, env: NodeJS.ProcessEnv = pro
     const saved = new SavedServers({ env });
     const server = saved.at(origin);
     if (!server) return {};
-    const live = await fetch(`${origin}/.well-known/openmausbot/environment`, { signal: AbortSignal.timeout(3_000) })
+    const live = await fetch(`${origin}/.well-known/nibble/environment`, { signal: AbortSignal.timeout(3_000) })
       .then((response) => response.json() as Promise<{ environmentId?: unknown }>, () => null);
     const token = live?.environmentId === server.environmentId ? saved.token(server.name) : null;
     return token ? { authorization: `Bearer ${token}` } : {};

@@ -3,8 +3,8 @@
 import { randomUUID } from "node:crypto";
 import { readLastRunVersion } from "./startup-cache-eviction.mjs";
 
-// The app's own PostHog project; the phc_ token is a write-only public key, the same one the app's pages send with.
-const TOKEN = "phc_m2hP39w8y2gLPvHgDvSXAu6xcZ3agjf4ruL56rGcMZEe";
+// Empty: this fork ships with no analytics project. Set a project token to enable PostHog; nothing is sent while blank.
+const TOKEN = "";
 const ENDPOINT = "https://us.i.posthog.com/i/v0/e/";
 const SEND_TIMEOUT_MS = 10_000;
 
@@ -50,7 +50,7 @@ const allowed = (value, list) => (typeof value === "string" && list.includes(val
  * One `desktop_launch` event per stage reached, under a random id made for this launch alone and kept nowhere: it ties
  * the stages of one launch together, never one launch to another, to a page's id or to a person.
  */
-export function createLaunchAnalytics({ fetch, choice, lastVersion, version, platform, packaged, env, now = Date.now, id = randomUUID() }) {
+export function createLaunchAnalytics({ fetch, choice, lastVersion, version, platform, packaged, env, now = Date.now, id = randomUUID(), token = TOKEN }) {
   const startedAt = now();
   const firstLaunch = lastVersion === null;
   const updated = !firstLaunch && lastVersion !== version;
@@ -59,7 +59,7 @@ export function createLaunchAnalytics({ fetch, choice, lastVersion, version, pla
   const stage = (name, { reason, hidden } = {}) => {
     if (!LAUNCH_STAGES.includes(name) || reached.has(name)) return;
     reached.add(name);
-    if (!launchAnalyticsAllowed({ choice: choice(), firstLaunch, lastVersion, packaged, env })) return;
+    if (!token || !launchAnalyticsAllowed({ choice: choice(), firstLaunch, lastVersion, packaged, env })) return;
     const why = reason ?? (name === "server_failed" ? serverFailure : undefined);
     const properties = {
       stage: name, ms: Math.max(0, Math.round(now() - startedAt)), first_launch: firstLaunch, updated,
@@ -69,7 +69,7 @@ export function createLaunchAnalytics({ fetch, choice, lastVersion, version, pla
     try {
       void Promise.resolve(fetch(ENDPOINT, {
         method: "POST", headers: { "content-type": "application/json" }, credentials: "omit", cache: "no-store",
-        body: JSON.stringify({ api_key: TOKEN, event: "desktop_launch", distinct_id: id, timestamp: new Date(now()).toISOString(), properties }),
+        body: JSON.stringify({ api_key: token, event: "desktop_launch", distinct_id: id, timestamp: new Date(now()).toISOString(), properties }),
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       })).catch(() => {});
     } catch {}

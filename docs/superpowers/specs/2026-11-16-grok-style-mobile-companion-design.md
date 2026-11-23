@@ -1,4 +1,4 @@
-# Grok-Style Mobile Companion Design: Flutter Client for OpenMausBot
+# Grok-Style Mobile Companion Design: Flutter Client for Nibble
 
 - **Date:** 2026-11-16
 - **Status:** Approved
@@ -8,10 +8,10 @@
 
 ## 1. Problem Statement & Motivation
 
-OpenMausBot provides a desktop-centric experience with local AI agent teams. While the core harness restricts network binding to `127.0.0.1` for security (preventing DNS rebinding and host compromise), users need remote visibility, real-time streaming chat, and immediate tool approval capabilities from their smartphones.
+Nibble provides a desktop-centric experience with local AI agent teams. While the core harness restricts network binding to `127.0.0.1` for security (preventing DNS rebinding and host compromise), users need remote visibility, real-time streaming chat, and immediate tool approval capabilities from their smartphones.
 
 ### Goal
-Build a standalone **Flutter Mobile Client** (`mobile/`) with a refined, high-contrast, minimalist **Grok-style design language** (OLED true black, pulsing avatar animations, fluid streaming, and haptic feedback) that communicates securely with OpenMausBot via its dedicated **`companion` sidecar** (`:8810`).
+Build a standalone **Flutter Mobile Client** (`mobile/`) with a refined, high-contrast, minimalist **Grok-style design language** (OLED true black, pulsing avatar animations, fluid streaming, and haptic feedback) that communicates securely with Nibble via its dedicated **`companion` sidecar** (`:8810`).
 
 ---
 
@@ -30,7 +30,7 @@ flowchart TD
         SecureStore -.->|"Bearer Authorization"| NetClient
     end
 
-    subgraph Host["Host Machine (OpenMausBot Server)"]
+    subgraph Host["Host Machine (Nibble Server)"]
         subgraph Companion["Companion Sidecar (:8810)"]
             PairingHandler["Pairing Handler<br/>(QR code / 6-digit verify)"]
             DeviceAuth["Device Authorizer & Allowlist"]
@@ -40,7 +40,7 @@ flowchart TD
             DeviceAuth --> WireScrubber
         end
 
-        subgraph CoreHarness["OpenMausBot Harness (:8799 - Loopback Only)"]
+        subgraph CoreHarness["Nibble Harness (:8799 - Loopback Only)"]
             AgentRuntime["Agent Runtime (Bots)"]
             ToolEngine["Tool Execution Engine"]
         end
@@ -110,7 +110,7 @@ flowchart TD
 ## 5. Security & Verification Invariants
 
 1. **Zero Harness Exposure:**
-   - The phone communicates exclusively with `companion` (:8810). The OpenMausBot core harness remains strictly bound to `127.0.0.1`.
+   - The phone communicates exclusively with `companion` (:8810). The Nibble core harness remains strictly bound to `127.0.0.1`.
 2. **Device Token Authorization:**
    - All mobile requests transmit `Authorization: Bearer <deviceToken>`.
 3. **Isolated Test Fixtures:**

@@ -54,14 +54,14 @@ export const BASE_IMAGE = `${BASE_IMAGE_REPOSITORY}@${BASE_IMAGE_DIGEST}`;
 // Image and container labels, not this mutable tag, decide compatibility.
 export const IMAGE_REPOSITORY = "localhost/openmausbot/cua-local-vm";
 export const IMAGE_LAYER_VERSION = "9";
-export const IMAGE_LAYER_LABEL = "com.openmausbot.image-layer";
+export const IMAGE_LAYER_LABEL = "com.nibble.image-layer";
 export const IMAGE = `${IMAGE_REPOSITORY}:driver-${CUA_DRIVER_VERSION}-v${IMAGE_LAYER_VERSION}`;
 export const CONTAINER = "openmausbot-computer";
-export const MANAGED_LABEL = "com.openmausbot.local-vm";
-export const DRIVER_LABEL = "com.openmausbot.cua-driver";
-export const BASE_IMAGE_LABEL = "com.openmausbot.cua-base";
-export const WORKSPACE_LABEL = "com.openmausbot.workspace";
-export const TARGET_LABEL = "com.openmausbot.local-vm-target";
+export const MANAGED_LABEL = "com.nibble.local-vm";
+export const DRIVER_LABEL = "com.nibble.cua-driver";
+export const BASE_IMAGE_LABEL = "com.nibble.cua-base";
+export const WORKSPACE_LABEL = "com.nibble.workspace";
+export const TARGET_LABEL = "com.nibble.local-vm-target";
 export const VM_WORKSPACE_DIR = join(DATA_DIR, "vm-home");
 export const VM_WORKSPACE_GUEST = "/home/cua/workspace";
 export const DISPLAY = ":1";
@@ -374,7 +374,7 @@ function statusProblem(status: ContainerComputerStatus): string | null {
 
 function existingContainerProblem(status: ContainerComputerStatus): string | null {
   if (!status.imageMatches) return "The existing Local VM uses an older desktop or Cua Driver; recreate it";
-  if (!status.managed) return "The existing container was not created by OpenMausBot; recreate it";
+  if (!status.managed) return "The existing container was not created by Nibble; recreate it";
   if (status.network === "unsafe") return "The existing Local VM exposes its viewer publicly; recreate it";
   if (status.security === "unsafe") return "The existing Local VM is missing safety limits; recreate it";
   if (status.persistence === "unsafe") return "The existing Local VM is missing its durable folder; recreate it";
@@ -882,7 +882,7 @@ export async function containerComputerAction(
   if (action === "remove" && !before.managed) {
     throw Object.assign(
       new Error(
-        `The existing container named ${target.containerName} was not created by OpenMausBot; remove it manually in ${runtime}`,
+        `The existing container named ${target.containerName} was not created by Nibble; remove it manually in ${runtime}`,
       ),
       { status: 409 },
     );

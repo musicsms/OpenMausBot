@@ -3,7 +3,7 @@
 Status: draft for approval
 Date: 2026-11-18
 
-The Flutter companion (`mobile/`) reaches the owner's OpenMausBot server from
+The Flutter companion (`mobile/`) reaches the owner's Nibble server from
 anywhere through a relay the owner hosts, over WebSocket, end-to-end encrypted.
 The server runs on the owner's VPS and opens no inbound port for phones.
 
@@ -18,7 +18,7 @@ Tailscale on the phone or an exposed, internet-facing server.
 The owner wants the model they saw in Orca: both ends dial out to a relay over
 WebSocket, the phone works on any network after one QR scan, and nothing on the
 server is exposed. They want the relay to be theirs, not
-`relay1/relay2.openmausbot.com`.
+`relay1/relay2.example.com`.
 
 Most of this already exists in the repository and is reused, not redesigned:
 
@@ -38,7 +38,7 @@ and (2) the phone side of the wire spec in Dart.
 
 1. The owner deploys `relay/` on a VPS behind Cloudflare and gets
    `wss://relay.<owner-domain>` with no inbound port open on that VPS.
-2. The OpenMausBot server connects to that relay with relay tokens it signs
+2. The Nibble server connects to that relay with relay tokens it signs
    itself; no `openmausbot login`, no `openmausbot.com` dependency.
 3. The pairing QR names the owner's relay; the Flutter app pairs by scanning it
    and then chats, streams replies, and answers tool approvals through the
@@ -54,13 +54,13 @@ and (2) the phone side of the wire spec in Dart.
 ## Non-goals (this phase)
 
 - Running the relay on Cloudflare Workers / Durable Objects (roadmap, phase 2).
-- More than one OpenMausBot server, or other people's servers, on the relay
+- More than one Nibble server, or other people's servers, on the relay
   (roadmap, phase 3).
 - Deploying the hosted control plane (`cloudflare/control-plane`), email OTP
   sign-in, or tunnels.
 - Computer viewing and live browser views over the relay (WebSocket upgrades
   answer `501` over the relay today; the app shows them as unavailable).
-- Pairing the Flutter app with the OpenMausBot desktop app / companion sidecar
+- Pairing the Flutter app with the Nibble desktop app / companion sidecar
   (`:8810`), or with any `openmausbot.com` service. Code in the app that
   exists only for the desktop sidecar may be removed.
 - Changing the desktop app's own hosted-relay behaviour (left as inherited
@@ -81,11 +81,11 @@ and (2) the phone side of the wire spec in Dart.
 - Self-host the relay; do not depend on `openmausbot.com` relays.
 - Option B now: the existing Node relay on a VPS behind Cloudflare.
   Option A (Workers + Durable Objects) later, after the Flutter app works.
-- One OpenMausBot server (the owner's) uses the relay for now.
+- One Nibble server (the owner's) uses the relay for now.
 - Transport is WebSocket, as in Orca.
 - This repository is the owner's fork and stands on its own: the Flutter app
-  talks only to the owner's OpenMausBot server through the owner's relay. It
-  does not pair with the OpenMausBot desktop app or its companion sidecar,
+  talks only to the owner's Nibble server through the owner's relay. It
+  does not pair with the Nibble desktop app or its companion sidecar,
   and it never uses `openmausbot.com` relays, control plane or hosted
   addresses.
 - Both Option A and multi-server / multi-user go in the roadmap below.
@@ -95,7 +95,7 @@ and (2) the phone side of the wire spec in Dart.
 ```
 📱 Flutter app ──wss──▶ Cloudflare ──Tunnel──▶ cloudflared ──▶ relay/ 127.0.0.1:8080
                                                                    ▲
-🖥️ OpenMausBot server ──wss──▶ Cloudflare ──Tunnel──▶ ... ─────────┘
+🖥️ Nibble server ──wss──▶ Cloudflare ──Tunnel──▶ ... ─────────┘
    (signs its own relay token)
         └════════ Noise session, yamux streams, HTTP/1.1 ════════┘
 ```
@@ -106,7 +106,7 @@ and (2) the phone side of the wire spec in Dart.
   `cloudflared` runs on the relay VPS and forwards `relay.<domain>` to
   `127.0.0.1:8080`. Cloudflare terminates public TLS; no port 443 is opened on
   the VPS. Caddy is not needed in this variant.
-- The relay may run on the same VPS as the OpenMausBot server or a separate
+- The relay may run on the same VPS as the Nibble server or a separate
   one; the deploy must work for both. (Builder: document both; default to the
   same VPS, since the owner has one server today. *Our call.*)
 - Client IP for per-IP limits: behind cloudflared the TCP peer is loopback.
@@ -210,7 +210,7 @@ Implement the phone side of spec v1 in Dart under `mobile/lib/core/e2e/`
 - Dart unit tests against `companion/src/e2e/vectors/v1.json` (handshake,
   transport records, yamux frames).
 - An automated interop test: start the real `relay/` and a fake-engine
-  OpenMausBot server in self-hosted relay mode (per
+  Nibble server in self-hosted relay mode (per
   `docs/verification/README.md`, isolated fixture, never live data), pair the
   Dart client from the generated QR, send a chat message, receive a streamed
   reply, answer an approval, revoke the device and see 4404/4001.

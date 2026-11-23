@@ -137,7 +137,7 @@ class PairingViewState extends State<PairingView> {
                 ),
                 const SizedBox(height: 32),
                 const Text(
-                  'Scan QR code from OpenMausBot Desktop Settings → Phone & devices',
+                  "Scan the QR code from your desktop app's Settings → Phone & devices",
                   textAlign: TextAlign.center,
                   style: TextStyle(color: GrokTheme.textMuted, fontSize: 14),
                 ),

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const hook = path.join(root, "build", "linux-after-install.sh");
 const removeHook = path.join(root, "build", "linux-after-remove.sh");
-const browserPolicy = path.join(root, "build", "linux-openmausbot-browser.apparmor");
+const browserPolicy = path.join(root, "build", "linux-nibble-browser.apparmor");
 const temporaryDirectories = [];
 
 function fixture() {
@@ -72,7 +72,7 @@ afterEach(() => {
 describe("Linux DEB sandbox policy", () => {
   it("allows user namespaces only for the exact installed browser executable", () => {
     const policy = fs.readFileSync(browserPolicy, "utf8").replace(/^\s*#.*$/gm, "");
-    expect(policy).toContain("profile openmausbot-browser /opt/OpenMausBot/resources/browser-engine/chrome/chrome-headless-shell-linux64/chrome-headless-shell flags=(unconfined)");
+    expect(policy).toContain("profile openmausbot-browser /opt/Nibble/resources/browser-engine/chrome/chrome-headless-shell-linux64/chrome-headless-shell flags=(unconfined)");
     expect(policy).toContain("userns,");
     expect(policy).not.toMatch(/\*|@\{HOME\}|\/home\/|\/tmp\//);
   });

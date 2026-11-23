@@ -35,7 +35,7 @@ describe("self-hosted server pairing links", () => {
     "https://bots.example.com/other#code=ABCD-EFGH-JKLM",
     "https://bots.example.com/pair#code=ABCD EFGH JKLM",
     "https://bots.example.com\\@other.example/pair#code=ABCD-EFGH-JKLM",
-    "openmausbot://pair?code=123456",
+    "nibble://pair?code=123456",
   ])("rejects an incomplete, malformed, or insecure link: %s", (link) => {
     expect(isServerPairingLink(link)).toBe(false);
   });
@@ -77,7 +77,7 @@ describe("remote connection Settings", () => {
     expect(html).toContain("Companion address");
     expect(html).toContain("Six-digit companion code");
     expect(html).toContain('placeholder="000000"');
-    expect(html).toContain("managed MausBot HTTPS address");
+    expect(html).toContain("managed Nibble HTTPS address");
     expect(html).toContain("Tailscale name ending in .ts.net");
     expect(html).not.toContain("<select");
     expect(html).not.toContain("Server pairing link");

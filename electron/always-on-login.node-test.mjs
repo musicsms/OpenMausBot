@@ -11,7 +11,7 @@ import { createAlwaysOnHome } from "./always-on-home.mjs";
 import { createOpenAtLogin, HIDDEN_ARG } from "./open-at-login.mjs";
 
 const blocker = { start: () => 1, stop() {}, isStarted: () => true };
-const CHOSEN = "OpenMausBot at login";
+const CHOSEN = "Nibble at login";
 
 function world(t, platform) {
   const dir = mkdtempSync(path.join(tmpdir(), "omb-always-on-login-"));
@@ -43,7 +43,7 @@ function world(t, platform) {
     autostart: () => (existsSync(autostart) ? readFileSync(autostart, "utf8") : null),
   };
 }
-const marked = text => text !== null && text.includes("X-OpenMausBot-Lending=true") && text.includes(HIDDEN_ARG);
+const marked = text => text !== null && text.includes("X-Nibble-Lending=true") && text.includes(HIDDEN_ARG);
 
 test("Windows: off removes only the switch's own entry, so lending can add its hidden one afterwards", t => {
   const w = world(t, "win32");

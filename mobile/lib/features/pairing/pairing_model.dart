@@ -64,7 +64,7 @@ class PairingPayload {
 
   factory PairingPayload.fromJsonString(String raw) {
     final trimmed = raw.trim();
-    if (trimmed.startsWith('openmausbot://') ||
+    if (trimmed.startsWith('nibble://') ||
         trimmed.startsWith('http://') ||
         trimmed.startsWith('https://')) {
       return PairingPayload._fromUri(Uri.parse(trimmed));
@@ -93,7 +93,7 @@ class PairingPayload {
       code: code,
       machineName: data['machineName'] as String? ??
           data['name'] as String? ??
-          'OpenMausBot Desktop',
+          'Desktop',
       endpoints: endpoints,
       e2e: e2e,
     );
@@ -127,7 +127,7 @@ class PairingPayload {
 
     final token = uri.queryParameters['token'] ?? '';
     final code = uri.queryParameters['code'];
-    final name = uri.queryParameters['name'] ?? 'OpenMausBot Desktop';
+    final name = uri.queryParameters['name'] ?? 'Desktop';
     final remoteUrl = uri.queryParameters['remoteUrl'];
     final hosts = (uri.queryParameters['hosts'] ?? '')
         .split(',')
@@ -309,7 +309,7 @@ class PairResult {
     final device = json['device'];
     return PairResult(
       token: token,
-      serverName: json['serverName'] as String? ?? 'OpenMausBot',
+      serverName: json['serverName'] as String? ?? 'Desktop',
       deviceId: device is Map ? device['id'] as String? : null,
       endpoints: PairingPayload._endpointsFromJson(json['endpoints']) ?? const [],
       e2e: e2e,

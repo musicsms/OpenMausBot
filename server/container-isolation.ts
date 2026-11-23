@@ -3,7 +3,7 @@ import type { Runtime } from "./container-computer.ts";
 import { MAX_DESKTOP_CPUS, MIN_DESKTOP_CPUS, MIN_DESKTOP_MEMORY_GB } from "./container-limits.ts";
 
 /** The run flags a desktop was made with. A desktop made under other flags is updated like one on an older image. */
-export const DESKTOP_FLAGS_LABEL = "com.openmausbot.desktop-flags";
+export const DESKTOP_FLAGS_LABEL = "com.nibble.desktop-flags";
 export const DESKTOP_FLAGS_VERSION = "2";
 
 const GIB = 1024 * 1024 * 1024;

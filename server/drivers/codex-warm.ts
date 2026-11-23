@@ -128,7 +128,7 @@ export class CodexConnection {
    * is kept. True when the message was one of those. */
   absorb(message: any): boolean {
     if (message?.id !== undefined && message.method) {
-      this.write({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "No OpenMausBot turn is running on this thread." } });
+      this.write({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "No Nibble turn is running on this thread." } });
       return true;
     }
     const total = message?.method === "thread/tokenUsage/updated" && message.params?.threadId === this.nativeThreadId

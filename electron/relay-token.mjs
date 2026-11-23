@@ -1,4 +1,4 @@
-/** Keeps this computer's MausBot Relay token fresh while the relay is needed: fetched at once, again after the control
+/** Keeps this computer's Nibble Relay token fresh while the relay is needed: fetched at once, again after the control
  * plane's `refreshAfter` (an hour), and sooner when the relay refuses it. A token that is still valid survives a
  * failed refresh; the relay keeps spliced sessions through an expired control socket anyway. */
 const MINUTE_MS = 60_000;
@@ -9,7 +9,7 @@ const UNAVAILABLE_RETRY_MS = 30 * MINUTE_MS;
 const SIGN_IN_FALLBACK_MS = 60 * MINUTE_MS;
 const BACKOFF_MS = [MINUTE_MS, 2 * MINUTE_MS, 4 * MINUTE_MS, 8 * MINUTE_MS, 16 * MINUTE_MS, 32 * MINUTE_MS, 60 * MINUTE_MS];
 const MIN_REFRESH_MS = MINUTE_MS;
-const RELAY_HOST = /^relay[1-9][0-9]?\.openmausbot\.com$/;
+const DNS_NAME = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 const HOST_ID = /^[A-Za-z0-9_-]{22}$/;
 const TOKEN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
@@ -35,7 +35,7 @@ export function validRelayGrant(payload) {
   const { token, hostId, nodes, expiresAt, refreshAfter } = payload;
   if (typeof token !== "string" || token.length > 2_048 || !TOKEN.test(token)) return null;
   if (typeof hostId !== "string" || !HOST_ID.test(hostId)) return null;
-  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 4 || !nodes.every((node) => typeof node === "string" && RELAY_HOST.test(node))) return null;
+  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 4 || !nodes.every((node) => typeof node === "string" && node.length <= 253 && DNS_NAME.test(node))) return null;
   if (!Number.isSafeInteger(expiresAt) || !Number.isSafeInteger(refreshAfter) || refreshAfter > expiresAt) return null;
   return { token, hostId, nodes: [...nodes], expiresAt, refreshAfter };
 }

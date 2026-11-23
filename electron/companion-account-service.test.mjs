@@ -114,9 +114,7 @@ function signedCredentials(overrides = {}) {
 
 describe("Companion account service", () => {
   it("uses the packaged hosted default and only explicit safe development origins", () => {
-    expect(resolveCompanionControlPlaneURL({ isPackaged: true, environment: {} })).toBe(
-      "https://accounts.openmausbot.com",
-    );
+    expect(resolveCompanionControlPlaneURL({ isPackaged: true, environment: {} })).toBe("");
     expect(resolveCompanionControlPlaneURL({
       isPackaged: false,
       environment: { OMB_CONTROL_PLANE_URL: "http://127.0.0.1:8787/" },
@@ -1523,7 +1521,7 @@ describe("Companion account on demand", () => {
 
   it("tells a desktop below the minimum version to update", async () => {
     const message = friendlyCompanionAccountError(new ControlPlaneError("update_required", 426));
-    expect(message).toBe("This version of MausBot can no longer make secure links. Update MausBot, then try again. Local Wi-Fi and Tailscale pairing still work.");
+    expect(message).toBe("This version of Nibble can no longer make secure links. Update Nibble, then try again. Local Wi-Fi and Tailscale pairing still work.");
   });
 
   it("signs a relay-capable computer in without a tunnel when no phone needs one", async () => {

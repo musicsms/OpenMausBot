@@ -11,7 +11,7 @@ services:
       # Browser-reachable origin for Google OAuth redirect_uri (dashboard Connect).
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://127.0.0.1:8318}
       - AUTH_DIR=/root/.mcp-gateway/auth
-      # Required: stable bearer shared with OpenMausBot MCP headers.
+      # Required: stable bearer shared with Nibble MCP headers.
       - GATEWAY_INTERNAL_KEY=${GATEWAY_INTERNAL_KEY:?set GATEWAY_INTERNAL_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}

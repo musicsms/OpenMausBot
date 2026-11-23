@@ -223,7 +223,7 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
     childEnv.OMB_CLOUD_HOSTING_URL = hostingUrl;
     childEnv.OMB_CLOUD_HOSTING_TOKEN = parentEnv.OMB_CLOUD_HOSTING_TOKEN;
   }
-  // @devs reports reach a loopback fake only, else a closed port: never the MausBot team.
+  // @devs reports reach a loopback fake only, else a closed port: never the Nibble team.
   const bugReportUrl = parentEnv.OMB_BUG_REPORT_URL?.trim() ?? "";
   childEnv.OMB_BUG_REPORT_URL = /^http:\/\/127\.0\.0\.1:\d{1,5}\/[A-Za-z0-9/_-]*$/.test(bugReportUrl) ? bugReportUrl : "http://127.0.0.1:9/api/bug-reports";
   const tregUrl = parentEnv.OMB_TREG_URL?.trim() ?? "";
@@ -426,7 +426,7 @@ export async function launchVerificationServer(
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
         });
         const body = response.ok ? await response.json() as { app?: string } : null;
-        if (body?.app === "openmausbot") break;
+        if (body?.app === "nibble") break;
       } catch {
       }
       if (Date.now() >= deadline) throw new Error(`verification server did not become ready; see ${logPath}${logTail()}`);

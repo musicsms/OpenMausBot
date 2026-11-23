@@ -1,4 +1,4 @@
-// `serve --relay`: phones reach this server through MausBot Relay, end-to-end encrypted as they reach the desktop app.
+// `serve --relay`: phones reach this server through Nibble Relay, end-to-end encrypted as they reach the desktop app.
 // The server dials out to the relay, the phone dials the relay, and the relay splices sealed bytes it cannot open. Every
 // encrypted stream lands in the server's own request handler as a remote request, so a phone signs in with its own session.
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -542,7 +542,7 @@ export function startPhoneRelay(options: PhoneRelayOptions): PhoneRelay | null {
    * remote, and whatever Host, proxy, cookie or owner headers the phone wrote are replaced: it needs a session of its own. */
   function scrub(req: IncomingMessage, peer: Peer): void {
     for (const name of Object.keys(req.headers)) {
-      if (name === "cookie" || name.startsWith("x-openmausbot-") || (PROXY_HEADERS as readonly string[]).includes(name)) delete req.headers[name];
+      if (name === "cookie" || name.startsWith("x-nibble-") || (PROXY_HEADERS as readonly string[]).includes(name)) delete req.headers[name];
     }
     req.headers.host = "phone-relay.invalid";
     req.headers["x-forwarded-for"] = sourceOf(peer);
@@ -560,7 +560,7 @@ export function startPhoneRelay(options: PhoneRelayOptions): PhoneRelay | null {
     if (peer.kind === "pairing") {
       if (!PAIRING_SESSION_ROUTES.has(`${method} ${path}`)) return reply(res, 401, { error: "pair this phone first" });
       if (method === "POST" && devices.records().length >= MAX_RELAY_PHONES) {
-        return reply(res, 409, { error: `This server has ${MAX_RELAY_PHONES} phones on MausBot Relay. Remove one (openmausbot devices revoke ID), then pair again.` });
+        return reply(res, 409, { error: `This server has ${MAX_RELAY_PHONES} phones on Nibble Relay. Remove one (openmausbot devices revoke ID), then pair again.` });
       }
     } else {
       const bearer = bearerToken(req.headers.authorization);

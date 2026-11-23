@@ -57,7 +57,7 @@ async function mintTestCapability(
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-openmausbot-test-capability": TEST_CAPABILITY_KEY,
+      "x-nibble-test-capability": TEST_CAPABILITY_KEY,
     },
     body: JSON.stringify({
       botId,
@@ -72,7 +72,7 @@ async function mintTestCapability(
 }
 
 const PHONE_SECRET_TEST_IDENTITY = {
-  type: "openmausbot:phone-secret-key",
+  type: "nibble:phone-secret-key",
   version: 1,
   keyId: "taWSR_nZ7ojlH_0Z3tar6Q",
   privateKey: {
@@ -231,7 +231,7 @@ const waitForIsolatedServer = async (
       if (response.status === 200) {
         const health = await response.json() as { app?: unknown; pid?: unknown; static?: unknown };
         lastObservedHealth = JSON.stringify(health);
-        if (health.app === "openmausbot" && health.pid === serverChild.pid && health.static === true) return;
+        if (health.app === "nibble" && health.pid === serverChild.pid && health.static === true) return;
       }
     } catch {
     }
@@ -340,7 +340,7 @@ const delayedJsonBody = async (
 
 const claudePrompts = (file = fakeClaudePrompts): string[] =>
   existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean) : [];
-const COMPUTER_FREE_NOTE = "OpenMausBot computer update: the computer this conversation waited for is free again. Continue the task that parked waiting for it.";
+const COMPUTER_FREE_NOTE = "Nibble computer update: the computer this conversation waited for is free again. Continue the task that parked waiting for it.";
 
 /** The running turn's first screen call, which is what takes a cloud computer; the answer waits while another turn has it. */
 const reachForComputer = async () => {
@@ -430,7 +430,7 @@ beforeAll(async () => {
     '  const spec = JSON.parse(readFileSync(vpsFixture, "utf8"));',
     '  if (args[2] === "container" && args[3] === "ls") { process.stdout.write(`${spec.id.slice(0, 12)}\\n`); process.exit(0); }',
     '  if (args[2] === "container" && args[3] === "inspect") {',
-    '    process.stdout.write(JSON.stringify([{ Id: spec.id, Name: `/${spec.name}`, Config: { Labels: { "com.openmausbot.vps": "1", "com.openmausbot.container": spec.name } }, State: { Status: "exited", Running: false } }]));',
+    '    process.stdout.write(JSON.stringify([{ Id: spec.id, Name: `/${spec.name}`, Config: { Labels: { "com.nibble.vps": "1", "com.nibble.container": spec.name } }, State: { Status: "exited", Running: false } }]));',
     '    process.exit(0);',
     '  }',
     '  if (args[2] === "rm" && args[3] === "-f" && args[4] === spec.id) { rmSync(vpsFixture, { force: true }); process.exit(0); }',
@@ -443,7 +443,7 @@ beforeAll(async () => {
     '  const expected = spec?.name ?? raw;',
     '  if (args[0] === "info") { process.stdout.write("29\\n"); process.exit(0); }',
     '  if (args[0] === "inspect" && args[1] === expected) {',
-    '    const labels = spec?.managed ? { "com.openmausbot.local-vm": "1", "com.openmausbot.workspace": "1", "com.openmausbot.local-vm-target": spec.targetLabel } : {};',
+    '    const labels = spec?.managed ? { "com.nibble.local-vm": "1", "com.nibble.workspace": "1", "com.nibble.local-vm-target": spec.targetLabel } : {};',
     '    process.stdout.write(JSON.stringify([{ Config: { Image: "fixture", Labels: labels }, State: { Running: false }, Mounts: spec?.workspace ? [{ Type: "bind", Source: spec.workspace, Destination: "/home/cua/workspace", RW: true }] : [] }]));',
     '    process.exit(0);',
     '  }',
@@ -486,7 +486,7 @@ beforeAll(async () => {
   // a fleet of exactly one unknown driver: no CLI probes, no network
   mkdirSync(join(home, ".openmausbot"), { recursive: true });
   mkdirSync(join(staticDir, "assets"), { recursive: true });
-  writeFileSync(join(staticDir, "index.html"), "<!doctype html><title>Packaged OpenMausBot</title>");
+  writeFileSync(join(staticDir, "index.html"), "<!doctype html><title>Packaged Nibble</title>");
   writeFileSync(join(staticDir, "manifest.webmanifest"), '{"name":"Fixture web app","display":"standalone","start_url":"/"}');
   writeFileSync(join(staticDir, "assets", "smoke.css"), "body { color: white; }");
   writeFileSync(
@@ -1615,10 +1615,10 @@ describe("harness HTTP API", () => {
     expect(room.messages.find(
       (message: { id: string }) => message.id === "restarted-goal-card",
     )).toMatchObject({
-      text: "Goal failed: OpenMausBot restarted before this goal finished.",
+      text: "Goal failed: Nibble restarted before this goal finished.",
       goalRun: {
         status: "failed",
-        detail: "OpenMausBot restarted before this goal finished.",
+        detail: "Nibble restarted before this goal finished.",
         turnCount: 2,
         finishedAt: expect.any(Number),
       },
@@ -1704,7 +1704,7 @@ describe("harness HTTP API", () => {
       req.end();
     });
     expect(probe.status).toBe(200);
-    expect(probe.body).toEqual({ app: "openmausbot" });
+    expect(probe.body).toEqual({ app: "nibble" });
     const brand = await new Promise<{ status: number; body: unknown }>((resolve, reject) => {
       const req = request({ hostname: "127.0.0.1", port: PORT, path: "/api/brand", headers: { host: "example.com" } }, (res) => {
         let raw = "";
@@ -1715,7 +1715,7 @@ describe("harness HTTP API", () => {
       req.end();
     });
     expect(brand.status).toBe(200);
-    expect(Reflect.get(Object(Reflect.get(Object(brand.body), "brand")), "name")).toBe("OpenMausBot");
+    expect(Reflect.get(Object(Reflect.get(Object(brand.body), "brand")), "name")).toBe("Nibble");
     expect(await statusWithHeaders({ origin: "https://example.com" })).toBe(403);
     expect(await statusWithHeaders({ host: `127.0.0.2:${PORT}` })).toBe(200);
     expect(await statusWithHeaders({ host: `[::1]:${PORT}` })).toBe(200);
@@ -1733,7 +1733,7 @@ describe("harness HTTP API", () => {
   it("identifies itself on /api/health", async () => {
     const { status, body } = await api("GET", "/api/health");
     expect(status).toBe(200);
-    expect(body.app).toBe("openmausbot");
+    expect(body.app).toBe("nibble");
     expect(typeof body.pid).toBe("number");
     expect(body.static).toBe(true);
   });
@@ -1779,7 +1779,7 @@ describe("harness HTTP API", () => {
     expect(root.status).toBe(200);
     expect(root.headers.get("content-type")).toBe("text/html");
     expect(root.headers.get("cache-control")).toBe("no-cache");
-    expect(await root.text()).toContain("Packaged OpenMausBot");
+    expect(await root.text()).toContain("Packaged Nibble");
 
     const index = await fetch(`${BASE}/index.html`);
     expect(index.headers.get("cache-control")).toBe("no-cache");
@@ -1802,7 +1802,7 @@ describe("harness HTTP API", () => {
     expect(spa.status).toBe(200);
     expect(spa.headers.get("content-type")).toBe("text/html");
     expect(spa.headers.get("cache-control")).toBe("no-cache");
-    expect(await spa.text()).toContain("Packaged OpenMausBot");
+    expect(await spa.text()).toContain("Packaged Nibble");
 
     const missingChunk = await fetch(`${BASE}/assets/missing-abc123.js`);
     expect(missingChunk.status).toBe(200);
@@ -6128,7 +6128,7 @@ describe("harness HTTP API", () => {
         tagline: "Find and explain the signal.",
         summary: "A complete two-bot signal workflow.",
         category: "Research",
-        author: { name: "OpenMausBot" },
+        author: { name: "Nibble" },
         license: "MIT",
         outcomes: ["Produce a concise signal brief."],
         setupMinutes: 4,
@@ -6471,7 +6471,7 @@ describe("harness HTTP API", () => {
         .find((message: { id: string }) => message.id === messageId);
       expect(directCard).toMatchObject({
         kind: "secret",
-        text: "Securely provide the OpenAI API key from OpenMausBot on your phone or computer. It is never added to chat.",
+        text: "Securely provide the OpenAI API key from Nibble on your phone or computer. It is never added to chat.",
       });
       expect(directCard.secret.description).toContain(
         `${bot.name} can use it but never read it back.`,
@@ -6504,8 +6504,8 @@ describe("harness HTTP API", () => {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "x-openmausbot-companion": "1",
-            "x-openmausbot-companion-device": "phone-1",
+            "x-nibble-companion": "1",
+            "x-nibble-companion-device": "phone-1",
           },
           body: JSON.stringify(encryptedEnvelope),
         },
@@ -6612,7 +6612,7 @@ describe("harness HTTP API", () => {
       expect((await card(firstCard.messageId)).signIn).toMatchObject({ site: "example.com", superseded: true });
       expect(await card(secondCard.messageId)).toMatchObject({
         kind: "signin",
-        text: `${bot.name} needs you to sign in to example.com. Open this conversation in OpenMausBot to sign in, then press Done.`,
+        text: `${bot.name} needs you to sign in to example.com. Open this conversation in Nibble to sign in, then press Done.`,
         signIn: { url: "https://www.example.com/", site: "example.com", place: "browser", reason: "Still behind a login." },
       });
       expect((await card(secondCard.messageId)).signIn.superseded).toBeUndefined();
@@ -6968,7 +6968,7 @@ describe("harness HTTP API", () => {
             queueMicrotask(() => callback({ data: identity }));
           },
           postMessage(message) {
-            if (message?.type !== "openmausbot:phone-secret-save") return;
+            if (message?.type !== "nibble:phone-secret-save") return;
             writeFileSync(join(gate, message.requestId + ".started"), message.target);
             saves = saves.then(async () => {
               while (!existsSync(release)) await delay(10);
@@ -6988,13 +6988,13 @@ describe("harness HTTP API", () => {
                 const body = await response.json().catch(() => null);
                 if (!response.ok) throw new Error(body?.error || "credential config failed");
                 messages.emit("message", { data: {
-                  type: "openmausbot:phone-secret-save-result",
+                  type: "nibble:phone-secret-save-result",
                   requestId: message.requestId,
                   ok: true,
                 } });
               } catch (error) {
                 messages.emit("message", { data: {
-                  type: "openmausbot:phone-secret-save-result",
+                  type: "nibble:phone-secret-save-result",
                   requestId: message.requestId,
                   ok: false,
                   error: error instanceof Error ? error.message : String(error),
@@ -7162,8 +7162,8 @@ describe("harness HTTP API", () => {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "x-openmausbot-companion": "1",
-            "x-openmausbot-companion-device": deviceId,
+            "x-nibble-companion": "1",
+            "x-nibble-companion-device": deviceId,
           },
           body: JSON.stringify(Object.fromEntries(
             Object.entries(envelope).filter(([key]) => key !== "botId" && key !== "messageId"),
@@ -9156,7 +9156,7 @@ describe("harness HTTP API", () => {
 
       const page = await viaProxy("GET", callback.pathname + callback.search);
       expect(page.status).toBe(200);
-      expect(page.text).toBe("Signed in. You can close this tab and return to OpenMausBot.");
+      expect(page.text).toBe("Signed in. You can close this tab and return to Nibble.");
       expect(page.headers).toMatchObject({ "cache-control": "no-store", "referrer-policy": "no-referrer", "content-type": "text/plain; charset=utf-8" });
       expect(page.text).not.toContain(callback.searchParams.get("code"));
       expect(JSON.parse((await viaProxy("GET", `${base}/${auth.flowId}`, signedIn)).text).auth.phase).toBe("succeeded");
@@ -9504,8 +9504,8 @@ describe("harness HTTP API", () => {
       expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "hello" })).status).toBe(202);
       const seen = await readJsonFileWhenReady<{ systemPrompt?: string }>(fakeClaudeDump, 15_000);
       const system: string = seen.systemPrompt ?? "";
-      expect(system.startsWith("You are Kiwi, a personal bot in OpenMausBot. Role: Tracker.")).toBe(true);
-      const persona = "You are Kiwi, a personal bot in OpenMausBot. Role: Tracker.";
+      expect(system.startsWith("You are Kiwi, a personal bot in Nibble. Role: Tracker.")).toBe(true);
+      const persona = "You are Kiwi, a personal bot in Nibble. Role: Tracker.";
       const afterPersona = system.slice(persona.length);
       expect(afterPersona.startsWith("\n\nYour standing instructions follow.")).toBe(true);
       expect(system).toContain("--- BEGIN STANDING INSTRUCTIONS (SOUL.md, 28 bytes) ---\nFile bugs. Never file noise.\n--- END STANDING INSTRUCTIONS ---");
@@ -9601,7 +9601,7 @@ describe("harness HTTP API", () => {
       rmSync(fakeClaudeDump, { force: true });
       expect((await api("POST", `/api/bots/${bot.id}/messages`, { text: "hello" })).status).toBe(202);
       let system = (await readJsonFileWhenReady<{ systemPrompt: string }>(fakeClaudeDump, 15_000)).systemPrompt;
-      expect(system.startsWith("You are Blank, a personal bot in OpenMausBot.")).toBe(true);
+      expect(system.startsWith("You are Blank, a personal bot in Nibble.")).toBe(true);
       expect(system).not.toContain("at most four questions");
       expect(system).toContain("propose_profile");
 
@@ -10652,7 +10652,7 @@ describe("harness HTTP API", () => {
           postMessage(message) {
             if (message?.requestId && /browser-(?:bot|profile)-deleted/.test(message.type ?? "")) {
               queueMicrotask(() => messages.emit("message", { data: {
-                type: "openmausbot:browser-lifecycle-result",
+                type: "nibble:browser-lifecycle-result",
                 requestId: message.requestId,
                 ok: true,
               } }));
@@ -11069,7 +11069,7 @@ describe("harness HTTP API", () => {
 
       const removed = await api("POST", `/api/bots/${bot.id}/local-computer/remove`, {});
       expect(removed.status).toBe(409);
-      expect(removed.body.error).toMatch(/not created by OpenMausBot.*remove it manually/i);
+      expect(removed.body.error).toMatch(/not created by Nibble.*remove it manually/i);
       expect(readFileSync(fakeDockerLog, "utf8").split("\n")).not.toContain(
         `rm -f ${status.body.container_name}`,
       );
@@ -11187,9 +11187,9 @@ describe("harness HTTP API", () => {
       const cleared = await api("PUT", "/api/config", { vps: { sshAlias: "" } });
       expect(cleared.status, JSON.stringify(cleared.body)).toBe(200);
       expect(cleared.body.notice).toContain("Removed. fixture-vps could not be reached");
-      expect(cleared.body.notice).toContain(`docker -H ssh://fixture-vps ps -a --filter label=com.openmausbot.environment=${environmentId} `);
+      expect(cleared.body.notice).toContain(`docker -H ssh://fixture-vps ps -a --filter label=com.nibble.environment=${environmentId} `);
       expect(cleared.body.notice).toContain("docker -H ssh://fixture-vps rm -f <name>");
-      expect(cleared.body.notice).toContain("docker -H ssh://fixture-vps ps -a --filter label=com.openmausbot.vps=1 lists every managed one");
+      expect(cleared.body.notice).toContain("docker -H ssh://fixture-vps ps -a --filter label=com.nibble.vps=1 lists every managed one");
       expect(cleared.body.notice).toContain("A name that only starts with openmausbot-vps- does not prove it is this installation's: if you have nothing more, leave it");
       expect((await api("GET", "/api/config")).body.vps.sshAlias).toBe("");
       expect(existsSync(fakeVpsFixture)).toBe(true);
@@ -11380,7 +11380,7 @@ describe("harness HTTP API", () => {
         .find((message: { id: string }) => message.id === messageId);
       expect(roomCard).toMatchObject({
         kind: "secret",
-        text: "Securely provide the OpenAI API key from OpenMausBot on your phone or computer. It is never added to chat.",
+        text: "Securely provide the OpenAI API key from Nibble on your phone or computer. It is never added to chat.",
         from: { botId: second.id, name: second.name, color: second.color },
       });
 
@@ -11394,8 +11394,8 @@ describe("harness HTTP API", () => {
           method: "POST",
           headers: {
             "content-type": "application/json",
-            "x-openmausbot-companion": "1",
-            "x-openmausbot-companion-device": "phone-1",
+            "x-nibble-companion": "1",
+            "x-nibble-companion-device": "phone-1",
           },
           body: JSON.stringify({
             version: 1,
@@ -14216,7 +14216,7 @@ describe("bot memory API", () => {
       expect(before.body.sections[0]).toEqual({
         id: "persona",
         label: "Identity",
-        text: "You are Kiwi, a personal bot in OpenMausBot. Role: Tracker. About: Files bugs.",
+        text: "You are Kiwi, a personal bot in Nibble. Role: Tracker. About: Files bugs.",
         bytes: 78,
       });
       expect(before.body.sections.map((s: { id: string }) => s.id)).not.toContain("soul");
@@ -14579,7 +14579,7 @@ describe("message pages", () => {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: pathToFileURL(video).href, media: true }),
     });
     expect(issued.status).toBe(200);
-    expect(issued.headers.get("x-openmausbot-media")).toBe("1");
+    expect(issued.headers.get("x-nibble-media")).toBe("1");
     expect(issued.headers.get("cache-control")).toBe("private, no-store");
     const link = (await issued.json()) as { url: string; mime: string; bytes: number };
     expect(link.mime).toBe("video/mp4");

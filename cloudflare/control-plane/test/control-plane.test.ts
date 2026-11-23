@@ -285,7 +285,7 @@ describe("control-plane migrations and health", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      service: "openmausbot-control-plane",
+      service: "nibble-control-plane",
       capacity: {
         status: "unknown",
         checkedAt: null,

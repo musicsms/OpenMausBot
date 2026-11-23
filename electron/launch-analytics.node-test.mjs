@@ -9,7 +9,7 @@ function launch({ choice = null, lastVersion = null, version = "0.1.170", packag
   let clock = 1_000;
   const analytics = createLaunchAnalytics({
     fetch: async (url, init) => { sent.push({ url, init, body: JSON.parse(init.body) }); return { ok: true }; },
-    choice: () => choice, lastVersion, version, platform, packaged, env, now: () => clock, id: "launch-id",
+    choice: () => choice, lastVersion, version, platform, packaged, env, now: () => clock, id: "launch-id", token: "phc_test",
   });
   return { analytics, sent, tick: (ms) => { clock += ms; } };
 }

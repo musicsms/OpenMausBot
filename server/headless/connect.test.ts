@@ -23,7 +23,7 @@ beforeAll(async () => {
     for await (const chunk of req) raw += chunk;
     requests.push({ path: req.url ?? "", body: raw ? JSON.parse(raw) : undefined });
     const send = (status: number, body: unknown) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
-    if (req.url === "/.well-known/openmausbot/environment") return send(200, { environmentId: "env-1", label: "Sandbox", version: "0.1.109" });
+    if (req.url === "/.well-known/nibble/environment") return send(200, { environmentId: "env-1", label: "Sandbox", version: "0.1.109" });
     if (req.url === "/api/auth/pairing") return send(200, { code: "ABCD-EFGH-JKLM" });
     if (req.url === "/api/auth/pair") {
       const body = JSON.parse(raw);
@@ -58,7 +58,7 @@ describe("connect", () => {
     const result = JSON.parse(out[0]!);
     expect(result).toMatchObject({ ok: true, tokenFile: file, workspace: { label: "Sandbox", environmentId: "env-1" }, session: { label: "CI runner", scopes: ["admin", "client"] } });
     expect(JSON.stringify([out, err])).not.toContain("omb_sess_secret_token_value");
-    expect(requests.map((request) => request.path)).toEqual(["/.well-known/openmausbot/environment", "/api/auth/pairing", "/api/auth/pair"]);
+    expect(requests.map((request) => request.path)).toEqual(["/.well-known/nibble/environment", "/api/auth/pairing", "/api/auth/pair"]);
     expect(requests[1]!.body).toEqual({ label: "CI runner" });
   });
 
@@ -97,7 +97,7 @@ describe("connect", () => {
     expect(requests.at(-1)).toMatchObject({ path: "/api/auth/pair", body: { code: "ABCD-EFGH-JKLM" } });
     const lan = capture();
     expect(await runHeadless(["connect", "http://omb-test-no-such-host:1", "--code", "ABCD-EFGH-JKLM", "--out", join(dir, "token-lan")], { io: lan.io, env: {} })).toBe(5);
-    expect(lan.err[0]).toContain("no MausBot server answers at http://omb-test-no-such-host:1");
+    expect(lan.err[0]).toContain("no Nibble server answers at http://omb-test-no-such-host:1");
     const open = capture();
     expect(await runHeadless(["connect", "http://203.0.113.9:8799", "--code", "ABCD-EFGH-JKLM", "--out", join(dir, "token-open")], { io: open.io, env: {} })).toBe(2);
     expect(open.err.join("\n")).toContain("put HTTPS in front");

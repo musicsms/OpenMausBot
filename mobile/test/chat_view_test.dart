@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/theme/grok_theme.dart';
-import 'package:mobile/features/bots/avatar_pulse.dart';
-import 'package:mobile/features/chat/chat_message.dart';
-import 'package:mobile/features/chat/chat_view.dart';
+import 'package:nibble/core/theme/grok_theme.dart';
+import 'package:nibble/features/bots/avatar_pulse.dart';
+import 'package:nibble/features/chat/chat_message.dart';
+import 'package:nibble/features/chat/chat_view.dart';
 
 void main() {
   group('ChatMessage', () {
@@ -43,7 +43,7 @@ void main() {
 
       expect(find.text('Liệt kê files'), findsOneWidget);
       expect(find.byType(ChatView), findsOneWidget);
-      expect(find.text('OpenMausBot'), findsOneWidget);
+      expect(find.text('Nibble'), findsOneWidget);
       expect(find.text('Online'), findsOneWidget);
     });
 

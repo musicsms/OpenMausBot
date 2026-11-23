@@ -4,11 +4,11 @@ import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/e2e/descriptor.dart';
-import 'package:mobile/core/e2e/relay_client.dart';
-import 'package:mobile/core/network/sse_client.dart';
-import 'package:mobile/core/storage/pairing_storage.dart';
-import 'package:mobile/features/pairing/pairing_model.dart';
+import 'package:nibble/core/e2e/descriptor.dart';
+import 'package:nibble/core/e2e/relay_client.dart';
+import 'package:nibble/core/network/sse_client.dart';
+import 'package:nibble/core/storage/pairing_storage.dart';
+import 'package:nibble/features/pairing/pairing_model.dart';
 
 class _RealHttpOverrides extends HttpOverrides {}
 

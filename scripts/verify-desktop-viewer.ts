@@ -26,13 +26,13 @@ try {
   writeFileSync(join(bin, "docker"), `#!${process.execPath}
 let args = process.argv.slice(2);
 if (args[0] === "-H") args = args.slice(2);
-const labels = ${JSON.stringify({ "com.openmausbot.local-vm": "1", "com.openmausbot.cua-driver": CUA_DRIVER_VERSION, "com.openmausbot.cua-base": BASE_IMAGE_DIGEST, "com.openmausbot.image-layer": IMAGE_LAYER_VERSION, "com.openmausbot.workspace": "1" })};
+const labels = ${JSON.stringify({ "com.nibble.local-vm": "1", "com.nibble.cua-driver": CUA_DRIVER_VERSION, "com.nibble.cua-base": BASE_IMAGE_DIGEST, "com.nibble.image-layer": IMAGE_LAYER_VERSION, "com.nibble.workspace": "1" })};
 let result;
 const imageId = 'sha256:' + 'a'.repeat(64);
 if (args[0] === 'inspect' && /^openmausbot-vps-/.test(args[1])) result = [{
   Id:'b'.repeat(64), Image:imageId, State:{Running:true}, Mounts:[],
   Config:{Image:${JSON.stringify(IMAGE)}, Env:['VNC_PW=fixture-password'], Labels:{...labels,
-    'com.openmausbot.vps':'1', 'com.openmausbot.container':args[1], 'com.openmausbot.vps-viewer':'1'}},
+    'com.nibble.vps':'1', 'com.nibble.container':args[1], 'com.nibble.vps-viewer':'1'}},
   HostConfig:{Privileged:false,NetworkMode:'bridge',PortBindings:{},Memory:4294967296,MemorySwap:4294967296,NanoCpus:2000000000,
     PidsLimit:4096,CapDrop:['ALL'],CapAdd:['CAP_SETUID','CAP_SETGID'],IpcMode:'private',ShmSize:536870912,
     CgroupnsMode:'private',SecurityOpt:[],RestartPolicy:{Name:'unless-stopped',MaximumRetryCount:0}},

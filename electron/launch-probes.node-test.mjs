@@ -10,7 +10,7 @@ test("a started program is kept under a fixed name: never its folder, its argume
   assert.equal(programName("C:\\Windows\\System32\\reg.exe"), "reg");
   assert.equal(programName("scutil --proxy", { shell: true }), "scutil");
   assert.equal(programName("scutil --proxy"), "other");
-  assert.equal(programName("/Users/ada/Library/Application Support/OpenMausBot/bin/cua-driver"), "cua-driver");
+  assert.equal(programName("/Users/ada/Library/Application Support/Nibble/bin/cua-driver"), "cua-driver");
   assert.equal(programName("/Users/ada/Library/Application Support/ioreg helper/tool", { shell: true }), "other");
   assert.equal(programName("/Users/ada/Projects/acme-merger/bin/lookup_customer"), "other");
   assert.equal(programName("/Users/ada/ioreg-secrets/tool"), "other");
@@ -21,10 +21,10 @@ test("a started program is kept under a fixed name: never its folder, its argume
 test("a request is kept as the kind of its host; this computer is not a request at all", () => {
   assert.equal(hostKind("http://127.0.0.1:8799/api/health"), null);
   assert.equal(hostKind("http://localhost:5173/"), null);
-  assert.equal(hostKind("https://accounts.openmausbot.com/token?code=abc"), "accounts");
+  assert.equal(hostKind("https://accounts.openmausbot.com/token?code=abc"), "other");
   assert.equal(hostKind("https://omb-u-1.fly.dev/api/bots"), "cloud");
-  assert.equal(hostKind(new URL("https://c-opaque.openmausbot.com/x")), "cloud");
-  assert.equal(hostKind({ url: "https://github.com/milind-soni/OpenMausBot/releases" }), "updates");
+  assert.equal(hostKind(new URL("https://c-opaque.openmausbot.com/x")), "other");
+  assert.equal(hostKind({ url: "https://github.com/milind-soni/Nibble/releases" }), "updates");
   assert.equal(hostKind("https://raw.githubusercontent.com/x/y"), "updates");
   assert.equal(hostKind("https://intranet.acme.test/q?token=abc"), "other");
   assert.equal(hostKind("https://github.com.evil.test/"), "other");
@@ -92,7 +92,7 @@ test("requests off this computer are counted by kind while the same promise is h
   await owner.fetch("https://omb-u-1.fly.dev/a");
   await owner.fetch("https://omb-u-1.fly.dev/b");
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(watch.finish().net, { accounts: { n: 1, ms: 120 }, other: { n: 1, ms: 0 }, cloud: { n: 2, ms: 0 } });
+  assert.deepEqual(watch.finish().net, { other: { n: 2, ms: 120 }, cloud: { n: 2, ms: 0 } });
   assert.equal(owner.fetch, original);
 });
 

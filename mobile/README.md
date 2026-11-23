@@ -1,6 +1,6 @@
-# OpenMausBot mobile companion (Flutter)
+# Nibble mobile companion (Flutter)
 
-Thin Flutter client for the OpenMausBot companion sidecar (`:8810`). Talks the
+Thin Flutter client for the Nibble companion sidecar (`:8810`). Talks the
 real allowlist: `POST /api/pair` → Bearer `token`, `GET /api/health`,
 `GET /api/events` (SSE), `POST /api/bots/:id/messages`, and approval respond.
 

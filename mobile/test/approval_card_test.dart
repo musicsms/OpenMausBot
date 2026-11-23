@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/theme/grok_theme.dart';
-import 'package:mobile/features/approvals/approval_card.dart';
-import 'package:mobile/features/approvals/approval_model.dart';
+import 'package:nibble/core/theme/grok_theme.dart';
+import 'package:nibble/features/approvals/approval_card.dart';
+import 'package:nibble/features/approvals/approval_model.dart';
 
 void main() {
   testWidgets('ApprovalCard displays tool arguments and handles approve tap', (WidgetTester tester) async {

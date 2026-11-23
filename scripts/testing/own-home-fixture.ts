@@ -1,5 +1,5 @@
 // This computer's server, started as the desktop app starts it (its private port emulated over Node's IPC), and servers of
-// the person's own (`openmausbot serve`, nothing of MausBot Cloud), each paired with this app as a pairing link pairs it.
+// the person's own (`openmausbot serve`, nothing of Nibble Cloud), each paired with this app as a pairing link pairs it.
 // Main's own wiring for the move to such a server (electron/own-home-main.mjs) sits between them, its requests carrying
 // the pairing's session as the window's would. Disposable homes and a synthetic Claude CLI; no network.
 import { randomBytes } from "node:crypto";
@@ -110,12 +110,12 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, "testing", "fake-cl
   const desktopBase = `http://127.0.0.1:${desktopPort}`;
   const startDesktop = async () => {
     const child = await start("desktop", { OMB_DESKTOP_PARENT: "1", OMB_ENVIRONMENT_LABEL: "Work laptop" }, desktopPort, ["--import", parentPort], true);
-    child.send({ type: "openmausbot:desktop-mutation-token", token: capability });
+    child.send({ type: "nibble:desktop-mutation-token", token: capability });
     return child;
   };
   let desktop = await startDesktop();
   const local: Side = async (method, path, body) => {
-    const response = await fetch(`${desktopBase}${path}`, { method, headers: { "x-openmausbot-desktop-owner": capability, ...(body === undefined ? {} : { "content-type": "application/json" }) },
+    const response = await fetch(`${desktopBase}${path}`, { method, headers: { "x-nibble-desktop-owner": capability, ...(body === undefined ? {} : { "content-type": "application/json" }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     return { status: response.status, body: parse(await response.text()) };
   };
@@ -137,7 +137,7 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, "testing", "fake-cl
     // `openmausbot pair` on that server, then the link opened in this app: a session of the admin scope.
     const minted = await fetch(`${base}/api/auth/pairing`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label: "My desktop" }) });
     const code = (await minted.json() as { code: string }).code;
-    const paired = await fetch(`${base}/api/auth/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, label: "OpenMausBot app" }) });
+    const paired = await fetch(`${base}/api/auth/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, label: "Nibble app" }) });
     const token = (await paired.json() as { token: string }).token;
     if (typeof token !== "string") throw new Error(`could not pair with ${name}`);
     const as: Side = async (method, path, body) => {
@@ -161,7 +161,7 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, "testing", "fake-cl
   const asks = createLoginHandoffClient();
   const port = { postMessage: (message: unknown) => { desktop.send(message as object); } };
   const wire = () => installOwnHome({
-    localRequest: (route, init = {}) => fetch(`${desktopBase}${route}`, { ...init, headers: { ...init.headers as Record<string, string>, "x-openmausbot-desktop-owner": capability } }),
+    localRequest: (route, init = {}) => fetch(`${desktopBase}${route}`, { ...init, headers: { ...init.headers as Record<string, string>, "x-nibble-desktop-owner": capability } }),
     fetch: windowFetch,
     environments: () => servers.map((server) => server.place),
     handoff: (what) => asks.request(port, what as never),

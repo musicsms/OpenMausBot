@@ -2225,7 +2225,7 @@ describe("managed endpoint provider capacity", () => {
     const text = await response.text();
     expect(JSON.parse(text)).toMatchObject({
       ok: true,
-      service: "openmausbot-control-plane",
+      service: "nibble-control-plane",
       capacity: {
         checkedAt: expect.any(Number),
         dnsRecords: { limit: 3500, used: 400 },
@@ -3369,7 +3369,7 @@ describe("managed endpoints in several Cloudflare accounts", () => {
     const text = await response.text();
     expect(JSON.parse(text)).toEqual({
       ok: true,
-      service: "openmausbot-control-plane",
+      service: "nibble-control-plane",
       capacity: {
         status: "ok",
         checkedAt: now - 120_000,

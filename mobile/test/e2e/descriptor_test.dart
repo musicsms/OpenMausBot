@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/core/e2e/credentials.dart';
-import 'package:mobile/core/e2e/descriptor.dart';
+import 'package:nibble/core/e2e/credentials.dart';
+import 'package:nibble/core/e2e/descriptor.dart';
 
 void main() {
   group('E2E Descriptor parsing', () {

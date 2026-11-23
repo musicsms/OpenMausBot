@@ -1,6 +1,6 @@
 # Phone push: alerts when the phone app is closed
 
-Today the MausBot phone app only gets a notification while it is connected to its
+Today the Nibble phone app only gets a notification while it is connected to its
 computer or Cloud. The app builds every notification itself from the live event
 stream (`notify` frames). So an alert arrives while the app is open, for about
 25 seconds after it goes to the background on iPhone, or all the time on Android
@@ -116,7 +116,7 @@ the frames it missed, or the stream closes just as an alert is sent.
   shown: the stream's own notification wins.
 - If the identifier would be longer than 64 bytes (APNs' limit), the push
   falls back to one identifier per kind and conversation. That only happens
-  for thread ids over 40 characters; MausBot's are shorter.
+  for thread ids over 40 characters; Nibble's are shorter.
 
 ## Privacy and threat model
 
@@ -128,7 +128,7 @@ message text, files or credentials. It logs only the request id, the platform
 and the provider's status and reason, never the token or the payload.
 
 **What Apple and Google learn.** The same names, ids and title, the device
-token, and when MausBot pushed to the phone. Not the content of any
+token, and when Nibble pushed to the phone. Not the content of any
 conversation.
 
 **Where tokens are kept.** On the computer or Cloud, in
@@ -232,7 +232,7 @@ and its phones keep today's behaviour.
 
 The owner asked for push "like the reference app does it, with a relay". This
 section says what the reference app actually does, how each part maps onto
-MausBot, and which design we keep.
+Nibble, and which design we keep.
 
 ### How the reference app does it
 
@@ -264,9 +264,9 @@ MausBot, and which design we keep.
   without a foreground service and shows one ongoing "agent activity"
   notification plus alerts.
 
-### How that maps onto MausBot
+### How that maps onto Nibble
 
-| The reference app | MausBot |
+| The reference app | Nibble |
 | --- | --- |
 | The user's server watches its events and decides | The computer or Cloud (`server/phone-push.ts`) does the same |
 | Hosted relay: holds the APNs and Firebase keys, stores tokens, sends | The control plane's push routes (`cloudflare/control-plane/src/push.ts`) |
@@ -275,14 +275,14 @@ MausBot, and which design we keep.
 | Live Activity tokens registered, updates and ends by push | The same (`/api/push/activity`, control plane `push/activity`) |
 | Android ongoing notification from FCM data, no foreground service | The same (the phone app's `bot-activity` module) |
 
-MausBot also has something called a relay: MausBot Relay (`relay1`, `relay2`,
+Nibble also has something called a relay: Nibble Relay (`relay1`, `relay2`,
 `relay/` in this repository). It is a different thing. It splices the phone's
 end-to-end encrypted connection to the computer and cannot read a byte of it,
 so it never sees an event, a bot name or a token. The reference app's relay is
 a hosted service that receives plain state from the user's server and talks to
-Apple and Google. In MausBot that service is the control plane.
+Apple and Google. In Nibble that service is the control plane.
 
-### Should push go through MausBot Relay as well, or instead?
+### Should push go through Nibble Relay as well, or instead?
 
 What it would buy:
 
@@ -307,20 +307,20 @@ What it would cost or break:
   control plane can serve them all.
 - **It weakens what the relay promises.** Today a relay compromise exposes
   only ciphertext and connection metadata. With push it would also expose
-  device tokens and the keys that can alert every MausBot phone.
+  device tokens and the keys that can alert every Nibble phone.
 - **Credentials would sit outside Cloudflare's secret store,** on hosts we
   patch ourselves.
 
 **Recommendation: keep the control plane as the sender. It already is our
 equivalent of the reference app's relay:** a single hosted service that holds
 the Apple and Google keys, receives content-free state from the user's own
-machine, and sends. MausBot Relay stays a blind splice. What we take from the
+machine, and sends. Nibble Relay stays a blind splice. What we take from the
 reference app is everything around the sender: the phone's registration
 robustness, Live Activities updated and ended by push from tokens the phone
 registers, and an ongoing "working" notification on Android driven by FCM data
-messages. MausBot keeps one difference on purpose: the phone registers with
+messages. Nibble keeps one difference on purpose: the phone registers with
 each computer, not with a hosted account, because a phone can be paired
-without any MausBot account at all.
+without any Nibble account at all.
 
 ## Switching it on
 
@@ -330,13 +330,13 @@ What the owner provides and does, in order. Nothing here has been done.
 
 1. In the Apple Developer account, create an APNs auth key (`.p8`) with the
    Apple Push Notifications service enabled. Note its Key ID and the Team ID.
-2. Enable the Push Notifications capability on the App ID `com.openmausbot.app`
+2. Enable the Push Notifications capability on the App ID `com.nibble.app`
    (and `.next` / `.dev` if those builds should get pushes), then regenerate
    the provisioning profiles.
 
 **Google**
 
-3. Create a Firebase project, add the Android app `com.openmausbot.companion`
+3. Create a Firebase project, add the Android app `com.nibble.companion`
    (and the `.next` / `.dev` packages if wanted), and download
    `google-services.json`.
 4. In Project settings → Service accounts, generate a private key (the
@@ -351,7 +351,7 @@ What the owner provides and does, in order. Nothing here has been done.
    use the same APNs key (topic `<bundle id>.push-type.liveactivity`) and the
    same Firebase project.
 6. Set the secrets: `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` (the
-   `.p8`), `APNS_BUNDLE_ID` (`com.openmausbot.app`), optionally
+   `.p8`), `APNS_BUNDLE_ID` (`com.nibble.app`), optionally
    `APNS_ENVIRONMENTS=production,sandbox` to accept development builds, and
    `FCM_SERVICE_ACCOUNT` (the whole service-account JSON).
 7. Deploy the Worker. Until a platform's secrets are set its routes answer
@@ -365,7 +365,7 @@ What the owner provides and does, in order. Nothing here has been done.
    the `aps-environment` entitlement (`production` for preview and production
    builds, `development` for development builds), Firebase on Android, and
    turns on token registration in the app. Update the store privacy answers
-   (the app now sends a device token to MausBot's servers and to Apple or
+   (the app now sends a device token to Nibble's servers and to Apple or
    Google).
 
 **Desktop and server**

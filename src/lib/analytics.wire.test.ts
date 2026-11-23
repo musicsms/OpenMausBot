@@ -103,7 +103,7 @@ it("sends events without any stored or current address, polls nothing, and sends
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
   try {
     const analytics = await import("./analytics");
-    await analytics.initAnalytics();
+    await analytics.initAnalytics(TOKEN);
     analytics.track("app_snapshot", { bots: 3 });
     await minutes(11);
     // posthog-js gzips each batch with the platform's CompressionStream, which finishes on the real clock, not the fake

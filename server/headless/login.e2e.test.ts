@@ -32,7 +32,7 @@ describe("openmausbot login, then status, bots, stop and threads against the des
   const security = fakeKeychain();
   const asApp = async (method: string, path: string, body?: unknown) => {
     const response = await fetch(`${fixture.info.url}${path}`, {
-      method, headers: { "content-type": "application/json", "x-openmausbot-desktop-owner": owner, origin: fixture.info.url },
+      method, headers: { "content-type": "application/json", "x-nibble-desktop-owner": owner, origin: fixture.info.url },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     return await response.json() as Record<string, any>;
@@ -46,7 +46,7 @@ describe("openmausbot login, then status, bots, stop and threads against the des
 
   beforeAll(async () => {
     const realFetch = globalThis.fetch;
-    globalThis.fetch = (input, init = {}) => realFetch(input, { ...init, headers: { ...Object.fromEntries(new Headers(init.headers)), "x-openmausbot-desktop-owner": owner } });
+    globalThis.fetch = (input, init = {}) => realFetch(input, { ...init, headers: { ...Object.fromEntries(new Headers(init.headers)), "x-nibble-desktop-owner": owner } });
     try {
       fixture = await launchVerificationServer({ ...process.env, OMB_TEST_DESKTOP_OWNER_TOKEN: owner });
     } finally {
@@ -82,7 +82,7 @@ describe("openmausbot login, then status, bots, stop and threads against the des
     await approving;
     expect(login.code).toBe(0);
     expect(login.err).toContain(shown);
-    expect(login.err).toContain("MausBot is asking you to allow this terminal");
+    expect(login.err).toContain("Nibble is asking you to allow this terminal");
     const signedIn = JSON.parse(login.out);
     expect(signedIn).toMatchObject({ ok: true, storedIn: "keychain", session: { scopes: ["admin", "client"] } });
     expect(login.out).not.toMatch(/omb_sess_/);

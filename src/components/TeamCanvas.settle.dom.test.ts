@@ -19,7 +19,7 @@ const fixture = vi.hoisted(() => {
 
 async function fakeApi(path: string) {
   await new Promise((resolve) => setTimeout(resolve, 5));
-  if (path.startsWith("/.well-known/openmausbot/environment")) return { environmentId: "fixture" };
+  if (path.startsWith("/.well-known/nibble/environment")) return { environmentId: "fixture" };
   if (path.startsWith("/api/team-map")) return { collaborations: [], queued: [], running: [] };
   if (path.startsWith("/api/computers/frames")) {
     if (!fixture.computersAnswer) return new Promise(() => {});

@@ -49,7 +49,7 @@ describe("desktop companion endpoint", () => {
     ]);
     expect(desktopCompanionRendererArguments("http://127.0.0.1:8798", access)).toEqual([
       "--omb-local-origin=http://127.0.0.1:8798",
-      "--openmausbot-remote-client",
+      "--nibble-remote-client",
     ]);
   });
 
@@ -60,20 +60,11 @@ describe("desktop companion endpoint", () => {
     expect(normalizeTailscaleCompanionEndpoint("http://HOST.example-tailnet.ts.net:9910/")).toBe(
       "http://host.example-tailnet.ts.net:9910",
     );
-    expect(normalizeDesktopCompanionEndpoint(`https://${LABEL}.openmausbot.com`)).toBe(
-      `https://${LABEL}.openmausbot.com`,
-    );
-    expect(normalizeDesktopCompanionEndpoint(`${LABEL}.openmausbot.com`)).toBe(
-      `https://${LABEL}.openmausbot.com`,
-    );
-    // The control plane's second Cloudflare account gives addresses here.
-    expect(normalizeDesktopCompanionEndpoint(`https://${LABEL}.mausbot.si`)).toBe(
-      `https://${LABEL}.mausbot.si`,
-    );
-    expect(normalizeDesktopCompanionEndpoint(` ${LABEL.toUpperCase()}.Mausbot.SI/ `)).toBe(
-      `https://${LABEL}.mausbot.si`,
-    );
     for (const endpoint of [
+      `https://${LABEL}.openmausbot.com`,
+      `${LABEL}.openmausbot.com`,
+      `https://${LABEL}.mausbot.si`,
+      ` ${LABEL.toUpperCase()}.Mausbot.SI/ `,
       "https://unrelated.example.com",
       `http://${LABEL}.openmausbot.com`,
       "http://10.0.0.4:8810",
@@ -109,7 +100,7 @@ describe("desktop companion endpoint", () => {
   it("accepts one c-<32 hex> label under each listed domain, and only those", () => {
     // The third domain is a one-line change; until the owner names it, nothing new is accepted.
     expect(NEXT_MANAGED_COMPANION_HOST_SUFFIX).toBe("");
-    expect(MANAGED_COMPANION_HOST_SUFFIXES).toEqual(["openmausbot.com", "mausbot.si"]);
+    expect(MANAGED_COMPANION_HOST_SUFFIXES).toEqual([]);
     expect(Object.isFrozen(MANAGED_COMPANION_HOST_SUFFIXES)).toBe(true);
     for (const suffix of MANAGED_COMPANION_HOST_SUFFIXES) {
       expect(suffix).toMatch(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/);
@@ -133,14 +124,9 @@ describe("desktop companion endpoint", () => {
   });
 
   it("validates, adds, and removes the encrypted credential document field", () => {
-    const hostedAccess = { ...access, endpoint: `https://${LABEL}.openmausbot.com` };
-    expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: hostedAccess })).toEqual(
-      hostedAccess,
-    );
-    const secondDomain = { ...access, endpoint: `https://${LABEL}.mausbot.si` };
-    expect(desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: secondDomain })).toEqual(
-      secondDomain,
-    );
+    expect(
+      desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: { ...access, endpoint: `https://${LABEL}.openmausbot.com` } }),
+    ).toBeNull();
     expect(
       desktopCompanionAccess({ [DESKTOP_COMPANION_FIELD]: { ...access, endpoint: "https://app.mausbot.si" } }),
     ).toBeNull();
@@ -185,49 +171,14 @@ describe("desktop companion pairing", () => {
     });
   });
 
-  it("pairs through a managed HTTPS companion address", async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ token, device: { id: deviceId }, serverName: "Office computer" }), {
-        status: 201,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    const paired = await pairDesktopCompanion({
-      endpoint: `https://${LABEL}.openmausbot.com`,
-      code: "654321",
-      deviceName: "Desktop client",
-      requestId: "request-https-01",
-      fetchImpl,
-    });
-    expect(paired).toEqual({ ...access, endpoint: `https://${LABEL}.openmausbot.com` });
-    expect(fetchImpl).toHaveBeenCalledWith(
-      `https://${LABEL}.openmausbot.com/api/pair`,
-      expect.objectContaining({ method: "POST" }),
-    );
-
-    const secondDomain = await pairDesktopCompanion({
-      endpoint: `${LABEL}.mausbot.si`,
-      code: "654321",
-      deviceName: "Desktop client",
-      requestId: "request-https-02",
-      fetchImpl,
-    });
-    expect(secondDomain).toEqual({ ...access, endpoint: `https://${LABEL}.mausbot.si` });
-    expect(fetchImpl).toHaveBeenLastCalledWith(
-      `https://${LABEL}.mausbot.si/api/pair`,
-      expect.objectContaining({ method: "POST" }),
-    );
-
-    await expect(
-      pairDesktopCompanion({
-        endpoint: "https://app.mausbot.si",
-        code: "654321",
-        deviceName: "Desktop client",
-        requestId: "request-https-03",
-        fetchImpl,
-      }),
-    ).rejects.toThrow("OpenMausBot HTTPS companion address");
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  it("rejects managed hosted companion addresses now that no suffix is listed", async () => {
+    const fetchImpl = vi.fn(async () => new Response("{}"));
+    for (const endpoint of [`https://${LABEL}.openmausbot.com`, `${LABEL}.mausbot.si`, "https://app.mausbot.si"]) {
+      await expect(
+        pairDesktopCompanion({ endpoint, code: "654321", deviceName: "Desktop client", requestId: "request-https-01", fetchImpl }),
+      ).rejects.toThrow();
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("rejects bad codes and surfaces a sidecar error without returning secrets", async () => {

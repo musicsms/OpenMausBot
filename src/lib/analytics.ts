@@ -4,7 +4,8 @@ import type { CaptureResult, PostHog } from "posthog-js";
 import { appVersion } from "@/lib/app-links";
 import { readAdvancedMode } from "@/lib/interface-mode";
 
-const TOKEN = "phc_m2hP39w8y2gLPvHgDvSXAu6xcZ3agjf4ruL56rGcMZEe";
+// Empty: this fork ships with no analytics project. Set a project token to enable PostHog; nothing is sent while blank.
+const TOKEN = "";
 
 // Read before init(): an opted-out install must never call posthog.init(), so no request leaves the machine.
 const OPT_OUT_KEY = "omb-analytics-opt-out";
@@ -69,11 +70,11 @@ function keepStoredOptOut() {
   void desktop.set(false).catch(() => {});
 }
 
-export function initAnalytics(): Promise<void> {
+export function initAnalytics(token = TOKEN): Promise<void> {
   keepStoredOptOut();
-  if (client || !analyticsEnabled()) return Promise.resolve();
+  if (!token || client || !analyticsEnabled()) return Promise.resolve();
   loading ??= import("posthog-js")
-    .then(({ default: posthog }) => start(posthog))
+    .then(({ default: posthog }) => start(posthog, token))
     .catch(() => {
       pending = [];
     })
@@ -83,12 +84,12 @@ export function initAnalytics(): Promise<void> {
   return loading;
 }
 
-function start(posthog: PostHog) {
+function start(posthog: PostHog, token: string) {
   if (!analyticsEnabled()) {
     pending = [];
     return;
   }
-  posthog.init(TOKEN, {
+  posthog.init(token, {
     api_host: "https://us.i.posthog.com",
     autocapture: false, // never capture clicked-element text (conversation leak)
     capture_pageview: false,

@@ -8,12 +8,12 @@
 
 ## 1. Problem Statement & Motivation
 
-OpenMausBot currently provides two mechanisms for third-party service integration:
+Nibble currently provides two mechanisms for third-party service integration:
 1. **Connected Apps via Composio:** Relies on external broker/cloud servers (`cloudflare/composio-broker` and `api.composio.dev`), routing sensitive user tokens and private data through third-party infrastructure.
 2. **Built-in MCP Client:** Already supports Model Context Protocol (MCP) servers locally via `stdio` subprocesses and remotely via `HTTP/SSE`.
 
 ### Goal
-Eliminate external broker dependency by introducing a **Self-Hosted Unified MCP Gateway**. This gateway runs locally alongside OpenMausBot, manages direct OAuth2/API credentials for multiple accounts per provider (inspired by `cliproxyapi` / `9router`), and exposes tools directly to OpenMausBot via the native MCP interface.
+Eliminate external broker dependency by introducing a **Self-Hosted Unified MCP Gateway**. This gateway runs locally alongside Nibble, manages direct OAuth2/API credentials for multiple accounts per provider (inspired by `cliproxyapi` / `9router`), and exposes tools directly to Nibble via the native MCP interface.
 
 Zero bytes of user data or authentication tokens pass through third-party intermediaries.
 
@@ -24,7 +24,7 @@ Zero bytes of user data or authentication tokens pass through third-party interm
 ```mermaid
 flowchart TD
     subgraph Host["Host Machine (Localhost)"]
-        User["User"] -->|"Chat / Instructions"| OMB["OpenMausBot Runtime"]
+        User["User"] -->|"Chat / Instructions"| OMB["Nibble Runtime"]
         User -->|"1. OAuth Consent & Configuration"| WebUI["Gateway Web UI (:8318)"]
 
         subgraph Gateway["Unified MCP Gateway (Docker / Local Process)"]
@@ -71,7 +71,7 @@ flowchart TD
    - **Slack Adapter:** Channels, Messages, Search (OAuth / Bot Token).
    - **Notion Adapter:** Pages, Databases, Search (API Key / OAuth).
    - **Custom REST Adapter:** Loads YAML/JSON specs to map arbitrary internal company APIs into MCP tools.
-4. **OpenMausBot MCP Integration:**
+4. **Nibble MCP Integration:**
    - Connects to the gateway as a standard Remote MCP server (`server/mcp-registry.ts`) via `http://127.0.0.1:8318/sse`.
    - Requires zero modifications to core agent drivers or LLM runtime.
 
@@ -98,7 +98,7 @@ Unlike LLM load-balancing proxies where requests can be routed round-robin acros
 1. **Localhost Binding:**
    - All gateway endpoints (`:8318`) bind exclusively to `127.0.0.1`.
 2. **Internal Secret Protection:**
-   - Gateway enforces an internal bearer token (`GATEWAY_INTERNAL_KEY`) generated on initialization. OpenMausBot sends this key via authorization headers.
+   - Gateway enforces an internal bearer token (`GATEWAY_INTERNAL_KEY`) generated on initialization. Nibble sends this key via authorization headers.
 3. **Storage Security:**
    - Files in `auth-dir` are restricted to file permissions `0600` (read/write only by owner).
    - Optional AES-256 encryption at rest for token files.
@@ -125,13 +125,13 @@ Unlike LLM load-balancing proxies where requests can be routed round-robin acros
 - Implement `auth-dir` storage manager with token refresh background daemon.
 - Implement Local Web UI (:8318) and CLI authentication runner.
 - Implement Google Workspace Adapter (Gmail, Calendar, Drive) and GitHub Adapter.
-- Mount Gateway as Remote MCP server in OpenMausBot and verify direct tool execution.
+- Mount Gateway as Remote MCP server in Nibble and verify direct tool execution.
 
 ### Phase 2: Slack, Notion & Custom REST API Adapter
 - Implement Slack Adapter (Channels, Messages) and Notion Adapter.
 - Implement `custom-apis.yaml` declarative parser for internal corporate REST APIs.
 - Unit and integration tests for dynamic schema generation.
 
-### Phase 3: OpenMausBot UX & Quick Templates
-- Add UI presets/templates in OpenMausBot Settings to connect to Local Gateway with 1 click.
-- Documentation for running via Docker Compose alongside OpenMausBot.
+### Phase 3: Nibble UX & Quick Templates
+- Add UI presets/templates in Nibble Settings to connect to Local Gateway with 1 click.
+- Documentation for running via Docker Compose alongside Nibble.
